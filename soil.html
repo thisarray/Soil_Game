@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Soil Game</title>
+  <script src="../jsgame0.js"></script>
+  <style type="text/css" media="screen">
+body {
+  background-color: white;
+  color: black;
+}
+.hidden {
+  display: none;
+}
+#original {
+  margin-left: 1em;
+}
+  </style>
+</head>
+
+<body>
+<section id="imageLoader" class="hidden">
+  <img class="hidden" src="images/board.png" alt="board" data-name="board">
+</section>
+
+<main>
+<h1>The Soil Game</h1>
+
+<canvas id="screen">
+The game screen appears here if your browser supports the Canvas API.
+</canvas>
+<section id="controls">
+  <button type="button" id="reset">Reset</button>
+  <button type="button" id="pause">Pause</button>
+</section>
+
+<h2>Attribution</h2>
+
+<p>Based on <a href="https://soilgame.wixsite.com/free2print">Dirty Matters: The Soil Game</a>.</p>
+
+<p>Licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons license BY-NC-SA 4.0</a>.</p>
+
+</main>
+
+<script>
+WIDTH = 1550;
+HEIGHT = 1078;
+
+/*
+ * Number angle to the center of each dial petal in radians.
+ */
+const DIAL_ANGLE = Math.PI / 8;
+
+/*
+ * Map mapping the string name to the center coordinates of each dial.
+ */
+const DIAL_CENTER_MAP = new Map([
+  ['abundance', [904, 254]],
+  ['diversity', [1157, 234]],
+  ['activity', [1304, 414]],
+  ['porosity', [648, 228]],
+  ['aggregate', [645, 539]],
+  ['depth', [649, 856]],
+  ['acidity', [922, 824]],
+  ['nutrients', [1158, 836]],
+  ['organic', [1304, 665]]
+]);
+
+/*
+ * Array color for the dial marker.
+ */
+const DIAL_COLOR = [0, 173, 239];
+
+/*
+ * Integer radius of each dial in pixels.
+ */
+const DIAL_RADIUS = 110;
+
+/*
+ * Array color to fill in the soil yield.
+ */
+const YIELD_COLOR = [174, 71, 64];
+
+/*
+ * Class containing the soil property values.
+ */
+class Game {
+  /*
+   * Function to limit a value to [0, 7], inclusive.
+   */
+  static limit(value) {
+    return Math.max(0, Math.min(value, 7));
+  }
+
+  constructor() {
+    // Biological
+    this._abundance = 2;
+    this._diversity = 2;
+    this._activity = 2;
+    // Physical
+    this._porosity = 2;
+    this._aggregate = 2;
+    this._depth = 2;
+    // Chemical
+    this._acidity = 2;
+    this._nutrients = 2;
+    this._organic = 2;
+  }
+
+  get abundance() {
+    return this._abundance;
+  }
+  set abundance(abundance) {
+    this._abundance = Game.limit(abundance);
+  }
+
+  get diversity() {
+    return this._diversity;
+  }
+  set diversity(diversity) {
+    this._diversity = Game.limit(diversity);
+  }
+
+  get activity() {
+    return this._activity;
+  }
+  set activity(activity) {
+    this._activity = Game.limit(activity);
+  }
+
+  get porosity() {
+    return this._porosity;
+  }
+  set porosity(porosity) {
+    this._porosity = Game.limit(porosity);
+  }
+
+  get aggregate() {
+    return this._aggregate;
+  }
+  set aggregate(aggregate) {
+    this._aggregate = Game.limit(aggregate);
+  }
+
+  get depth() {
+    return this._depth;
+  }
+  set depth(depth) {
+    this._depth = Game.limit(depth);
+  }
+
+  get acidity() {
+    return this._acidity;
+  }
+  set acidity(acidity) {
+    this._acidity = Game.limit(acidity);
+  }
+
+  get nutrients() {
+    return this._nutrients;
+  }
+  set nutrients(nutrients) {
+    this._nutrients = Game.limit(nutrients);
+  }
+
+  get organic() {
+    return this._organic;
+  }
+  set organic(organic) {
+    this._organic = Game.limit(organic);
+  }
+
+  cascade() {
+    /*
+     * Negative cascade
+     */
+
+    // Biological
+    if (this.abundance <= 0) {
+      this.diversity--;
+      this.activity--;
+    }
+    if (this.diversity <= 0) {
+      this.abundance--;
+      this.activity--;
+    }
+    if (this.activity <= 0) {
+      this.abundance--;
+      this.diversity--;
+    }
+
+    // Physical
+    if (this.porosity <= 0) {
+      this.aggregate--;
+      this.depth--;
+    }
+    if (this.aggregate <= 0) {
+      this.porosity--;
+      this.depth--;
+    }
+    if (this.depth <= 0) {
+      this.porosity--;
+      this.aggregate--;
+    }
+
+    // Chemical
+    if (this.acidity <= 0) {
+      this.nutrients--;
+      this.organic--;
+    }
+    if (this.nutrients <= 0) {
+      this.acidity--;
+      this.organic--;
+    }
+    if (this.organic <= 0) {
+      this.acidity--;
+      this.nutrients--;
+    }
+
+    /*
+     * Positive cascade
+     */
+
+    // Biological
+    if (this.abundance >= 7) {
+      this.diversity++;
+      this.activity++;
+    }
+    if (this.diversity >= 7) {
+      this.abundance++;
+      this.activity++;
+    }
+    if (this.activity >= 7) {
+      this.abundance++;
+      this.diversity++;
+    }
+
+    // Physical
+    if (this.porosity >= 7) {
+      this.aggregate++;
+      this.depth++;
+    }
+    if (this.aggregate >= 7) {
+      this.porosity++;
+      this.depth++;
+    }
+    if (this.depth >= 7) {
+      this.porosity++;
+      this.aggregate++;
+    }
+
+    // Chemical
+    if (this.acidity >= 7) {
+      this.nutrients++;
+      this.organic++;
+    }
+    if (this.nutrients >= 7) {
+      this.acidity++;
+      this.organic++;
+    }
+    if (this.organic >= 7) {
+      this.acidity++;
+      this.nutrients++;
+    }
+  }
+
+  get foodYield() {
+    let foodYield = 0;
+    foodYield += this.abundance;
+    foodYield += this.diversity;
+    foodYield += this.activity;
+    foodYield += this.porosity;
+    foodYield += this.aggregate;
+    foodYield += this.depth;
+    foodYield += this.acidity;
+    foodYield += this.nutrients;
+    foodYield += this.organic;
+    return foodYield;
+  }
+
+  isBreakdown() {
+    return ((this.organic === 0) || (this.activity === 7));
+  }
+
+  isFamine() {
+    return ((this.foodYield === 16) ||
+            (this.foodYield === 18) ||
+            (this.foodYield === 21) ||
+            (this.foodYield === 25) ||
+            (this.foodYield === 28));
+  }
+
+  isWaterPolluted() {
+    return ((this.aggregate === 0) ||
+            (this.nutrients === 7) ||
+            (this.porosity === 7));
+  }
+
+  isLost() {
+    if (this.isBreakdown() && this.isFamine() && this.isWaterPolluted()) {
+      // If all 3 Catastrophes occurred
+      return true;
+    }
+
+    if ((this.abundance + this.diversity + this.activity) <= 0) {
+      // Biological failure
+      return true;
+    }
+
+    if ((this.porosity + this.aggregate + this.depth) <= 0) {
+      // Physical failure
+      return true;
+    }
+
+    if ((this.acidity + this.nutrients + this.organic) <= 0) {
+      // Chemical failure
+      return true;
+    }
+
+    return false;
+  }
+
+  isWon() {
+    return ((!this.isLost()) && (this.foodYield >= 30));
+  }
+
+  drawFoodYield() {
+    if (this.foodYield <= 0) {
+      return;
+    }
+
+    if (this.foodYield < 9) {
+      if (this.foodYield < 2) {
+        screen.draw.filled_rect(new Rect(550, 40, 70, 65), YIELD_COLOR);
+        return;
+      }
+      screen.draw.filled_rect(new Rect(550, 40, 70 + ((this.foodYield - 1) * 120), 65), YIELD_COLOR);
+      return;
+    }
+
+    screen.draw.filled_rect(new Rect(550, 40, 945, 65), YIELD_COLOR);
+    if (this.foodYield < 16) {
+      if (this.foodYield < 10) {
+        screen.draw.filled_rect(new Rect(1415, 40, 80, 120), YIELD_COLOR);
+        return;
+      }
+      screen.draw.filled_rect(new Rect(1415, 40, 80, 120 + ((this.foodYield - 9) * 120), 65), YIELD_COLOR);
+      return;
+    }
+
+    screen.draw.filled_rect(new Rect(1415, 40, 80, 1020), YIELD_COLOR);
+    if (this.foodYield < 17) {
+      return;
+    }
+
+    if (this.foodYield < 24) {
+      if (this.foodYield < 18) {
+        screen.draw.filled_rect(new Rect(1300, 978, 200, 80), YIELD_COLOR);
+        return;
+      }
+      if (this.foodYield < 21) {
+        let x = 1145 - ((this.foodYield - 18) * 100);
+        screen.draw.filled_rect(new Rect(x, 978, 1500 - x, 80), YIELD_COLOR);
+        return;
+      }
+      let x = 810 - ((this.foodYield - 21) * 120);
+      screen.draw.filled_rect(new Rect(x, 978, 1500 - x, 80), YIELD_COLOR);
+      return;
+    }
+
+    screen.draw.filled_rect(new Rect(450, 978, 1050, 80), YIELD_COLOR);
+    if (this.foodYield < 24) {
+      return;
+    }
+
+    if (this.foodYield < 28) {
+      let y = 847 - ((this.foodYield - 25) * 120);
+      screen.draw.filled_rect(new Rect(428, y, 90, 1057 - y), YIELD_COLOR);
+      return;
+    }
+    if (this.foodYield < 29) {
+      screen.draw.filled_rect(new Rect(428, 468, 90, 589), YIELD_COLOR);
+      return;
+    }
+    if (this.foodYield < 30) {
+      screen.draw.filled_rect(new Rect(428, 388, 90, 669), YIELD_COLOR);
+      return;
+    }
+    screen.draw.filled_rect(new Rect(428, 337, 90, 720), YIELD_COLOR);
+  }
+}
+
+let game;
+
+function reset() {
+  game = new Game();
+}
+
+/*
+ * Draw the soil property dial centered at center with value indicated.
+ */
+function drawDial(center, value) {
+  let angle = ((value * 2) + 1) * DIAL_ANGLE,
+      lowAngle = angle - (DIAL_ANGLE / 2),
+      highAngle = angle + (DIAL_ANGLE / 2),
+      middle = [center[0] + ((DIAL_RADIUS - 10) * Math.sin(angle)),
+               center[1] - ((DIAL_RADIUS - 10) * Math.cos(angle))],
+      low = [center[0] + ((DIAL_RADIUS + 20) * Math.sin(lowAngle)),
+             center[1] - ((DIAL_RADIUS + 20) * Math.cos(lowAngle))],
+      high = [center[0] + ((DIAL_RADIUS + 20) * Math.sin(highAngle)),
+              center[1] - ((DIAL_RADIUS + 20) * Math.cos(highAngle))];
+  screen.draw.filled_polygon([middle, low, high], DIAL_COLOR);
+
+  screen.draw.circle(center, DIAL_RADIUS, DIAL_COLOR);
+}
+
+function draw() {
+  screen.clear('white');
+  game.drawFoodYield();
+  screen.blit('board', [0, 0]);
+
+  for (let [property, center] of DIAL_CENTER_MAP) {
+    drawDial(center, game[property]);
+  }
+
+  screen.draw.rect(new Rect(550, 40, 945, 65), 'blue');
+  screen.draw.rect(new Rect(1415, 40, 80, 1020), 'blue');
+  screen.draw.rect(new Rect(450, 978, 1050, 80), 'blue');
+  screen.draw.rect(new Rect(428, 337, 90, 720), 'blue');
+
+  screen.draw.rect(new Rect(107, 665, 75, 55), 'blue');
+  screen.draw.rect(new Rect(207, 665, 75, 55), 'blue');
+  screen.draw.rect(new Rect(307, 665, 75, 55), 'blue');
+
+  screen.draw.rect(new Rect(244, 800, 150, 55), 'blue');
+  screen.draw.rect(new Rect(244, 870, 150, 55), 'blue');
+  screen.draw.rect(new Rect(244, 944, 150, 55), 'blue');
+}
+
+function on_mouse_down(pos, buttons) {
+  console.log(pos);
+
+  for (let [property, center] of DIAL_CENTER_MAP) {
+    if (Math.hypot(pos[0] - center[0], pos[1] - center[1]) < DIAL_RADIUS) {
+      if ((buttons & mouse.LEFT) > 0) {
+        game[property]++;
+      }
+      else if ((buttons & mouse.RIGHT) > 0) {
+        game[property]--;
+      }
+    }
+  }
+}
+
+window.addEventListener('load', (event) => {
+  screen.init();
+});
+</script>
+</body>
+
+</html>
