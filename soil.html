@@ -79,7 +79,21 @@ const DIAL_COLOR = [0, 173, 239];
 const DIAL_RADIUS = 110;
 
 /*
- * Array color to fill in the soil yield.
+ * Array of integer breakpoints to color in the food yield.
+ */
+const YIELD_BREAKPOINTS = [
+  // Food yield 0 through 8 across the top
+  520, 660, 770, 890, 1000, 1110, 1230, 1340, 1500,
+  // Food yield 9 through 16 down the right side
+  190, 310, 440, 560, 680, 800, 920, 1060,
+  // Food yield 17 through 24 across the bottom
+  1260, 1146, 1010, 920, 810, 670, 540, 450,
+  // Food yield 25 through 30
+  850, 710, 600, 470, 370, 330
+];
+
+/*
+ * Array color to fill in the food yield.
  */
 const YIELD_COLOR = [174, 71, 64];
 
@@ -331,64 +345,34 @@ class Game {
       return;
     }
 
-    if (this.foodYield < 9) {
-      if (this.foodYield < 2) {
-        screen.draw.filled_rect(new Rect(550, 40, 70, 65), YIELD_COLOR);
-        return;
-      }
-      screen.draw.filled_rect(new Rect(550, 40, 70 + ((this.foodYield - 1) * 120), 65), YIELD_COLOR);
-      return;
-    }
-
-    screen.draw.filled_rect(new Rect(550, 40, 945, 65), YIELD_COLOR);
-    if (this.foodYield < 16) {
-      if (this.foodYield < 10) {
-        screen.draw.filled_rect(new Rect(1415, 40, 80, 120), YIELD_COLOR);
-        return;
-      }
-      screen.draw.filled_rect(new Rect(1415, 40, 80, 120 + ((this.foodYield - 9) * 120), 65), YIELD_COLOR);
-      return;
-    }
-
-    screen.draw.filled_rect(new Rect(1415, 40, 80, 1020), YIELD_COLOR);
-    if (this.foodYield < 17) {
-      return;
-    }
-
-    if (this.foodYield < 24) {
-      if (this.foodYield < 18) {
-        screen.draw.filled_rect(new Rect(1300, 978, 200, 80), YIELD_COLOR);
-        return;
-      }
-      if (this.foodYield < 21) {
-        let x = 1145 - ((this.foodYield - 18) * 100);
-        screen.draw.filled_rect(new Rect(x, 978, 1500 - x, 80), YIELD_COLOR);
-        return;
-      }
-      let x = 810 - ((this.foodYield - 21) * 120);
-      screen.draw.filled_rect(new Rect(x, 978, 1500 - x, 80), YIELD_COLOR);
-      return;
-    }
-
-    screen.draw.filled_rect(new Rect(450, 978, 1050, 80), YIELD_COLOR);
-    if (this.foodYield < 24) {
-      return;
-    }
-
-    if (this.foodYield < 28) {
-      let y = 847 - ((this.foodYield - 25) * 120);
-      screen.draw.filled_rect(new Rect(428, y, 90, 1057 - y), YIELD_COLOR);
-      return;
-    }
-    if (this.foodYield < 29) {
-      screen.draw.filled_rect(new Rect(428, 468, 90, 589), YIELD_COLOR);
-      return;
-    }
+    let breakpoint;
     if (this.foodYield < 30) {
-      screen.draw.filled_rect(new Rect(428, 388, 90, 669), YIELD_COLOR);
+      breakpoint = YIELD_BREAKPOINTS[this.foodYield];
+    }
+    else {
+      breakpoint = YIELD_BREAKPOINTS[30];
+    }
+
+    if (this.foodYield < 9) {
+      screen.draw.filled_polygon([[YIELD_BREAKPOINTS[0], 40], [breakpoint, 40], [breakpoint, 105], [550, 105]], YIELD_COLOR);
       return;
     }
-    screen.draw.filled_rect(new Rect(428, 337, 90, 720), YIELD_COLOR);
+
+    screen.draw.filled_polygon([[YIELD_BREAKPOINTS[0], 40], [YIELD_BREAKPOINTS[8], 40], [YIELD_BREAKPOINTS[8], 105], [550, 105]], YIELD_COLOR);
+    if (this.foodYield < 17) {
+      screen.draw.filled_rect(new Rect(1415, 40, 80, breakpoint - 40), YIELD_COLOR);
+      return;
+    }
+
+    screen.draw.filled_rect(new Rect(1415, 40, 80, YIELD_BREAKPOINTS[16] - 40), YIELD_COLOR);
+    if (this.foodYield < 25) {
+      screen.draw.filled_rect(new Rect(breakpoint, 977, 1495 - breakpoint, 80), YIELD_COLOR);
+      return;
+    }
+
+    screen.draw.filled_rect(new Rect(YIELD_BREAKPOINTS[24], 977, 1495 - YIELD_BREAKPOINTS[24], 80), YIELD_COLOR);
+
+    screen.draw.filled_rect(new Rect(428, breakpoint, 90, 1060 - breakpoint), YIELD_COLOR);
   }
 }
 
