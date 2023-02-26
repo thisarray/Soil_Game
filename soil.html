@@ -299,11 +299,12 @@ class Game {
   }
 
   isFamine() {
-    return ((this.foodYield === 16) ||
-            (this.foodYield === 18) ||
-            (this.foodYield === 21) ||
-            (this.foodYield === 25) ||
-            (this.foodYield === 28));
+    let foodYield = this.foodYield;
+    return ((foodYield === 16) ||
+            (foodYield === 18) ||
+            (foodYield === 21) ||
+            (foodYield === 25) ||
+            (foodYield === 28));
   }
 
   isWaterPolluted() {
@@ -341,31 +342,32 @@ class Game {
   }
 
   drawFoodYield() {
-    if (this.foodYield <= 0) {
+    let foodYield = this.foodYield,
+        breakpoint;
+    if (foodYield <= 0) {
       return;
     }
 
-    let breakpoint;
-    if (this.foodYield < 30) {
-      breakpoint = YIELD_BREAKPOINTS[this.foodYield];
+    if (foodYield < 30) {
+      breakpoint = YIELD_BREAKPOINTS[foodYield];
     }
     else {
       breakpoint = YIELD_BREAKPOINTS[30];
     }
 
-    if (this.foodYield < 9) {
+    if (foodYield < 9) {
       screen.draw.filled_polygon([[YIELD_BREAKPOINTS[0], 40], [breakpoint, 40], [breakpoint, 105], [550, 105]], YIELD_COLOR);
       return;
     }
 
     screen.draw.filled_polygon([[YIELD_BREAKPOINTS[0], 40], [YIELD_BREAKPOINTS[8], 40], [YIELD_BREAKPOINTS[8], 105], [550, 105]], YIELD_COLOR);
-    if (this.foodYield < 17) {
+    if (foodYield < 17) {
       screen.draw.filled_rect(new Rect(1415, 40, 80, breakpoint - 40), YIELD_COLOR);
       return;
     }
 
     screen.draw.filled_rect(new Rect(1415, 40, 80, YIELD_BREAKPOINTS[16] - 40), YIELD_COLOR);
-    if (this.foodYield < 25) {
+    if (foodYield < 25) {
       screen.draw.filled_rect(new Rect(breakpoint, 977, 1495 - breakpoint, 80), YIELD_COLOR);
       return;
     }
@@ -400,6 +402,14 @@ function drawDial(center, value) {
   screen.draw.circle(center, DIAL_RADIUS, DIAL_COLOR);
 }
 
+function drawMessage(message) {
+  screen.draw.text(message, {
+    center: [1010, 550],
+    color: YIELD_COLOR,
+    fontsize: 64
+  });
+}
+
 function draw() {
   screen.clear('white');
   game.drawFoodYield();
@@ -409,18 +419,26 @@ function draw() {
     drawDial(center, game[property]);
   }
 
-  screen.draw.rect(new Rect(550, 40, 945, 65), 'blue');
-  screen.draw.rect(new Rect(1415, 40, 80, 1020), 'blue');
-  screen.draw.rect(new Rect(450, 978, 1050, 80), 'blue');
-  screen.draw.rect(new Rect(428, 337, 90, 720), 'blue');
+  if (game.isFamine()) {
+    screen.draw.rect(new Rect(244, 800, 150, 55), DIAL_COLOR, 2);
+  }
+  if (game.isWaterPolluted()) {
+    screen.draw.rect(new Rect(244, 870, 150, 55), DIAL_COLOR, 2);
+  }
+  if (game.isBreakdown()) {
+    screen.draw.rect(new Rect(244, 944, 150, 55), DIAL_COLOR, 2);
+  }
+
+  if (game.isLost()) {
+    drawMessage('YOU\nLOST');
+  }
+  if (game.isWon()) {
+    drawMessage('YOU\nWON');
+  }
 
   screen.draw.rect(new Rect(107, 665, 75, 55), 'blue');
   screen.draw.rect(new Rect(207, 665, 75, 55), 'blue');
   screen.draw.rect(new Rect(307, 665, 75, 55), 'blue');
-
-  screen.draw.rect(new Rect(244, 800, 150, 55), 'blue');
-  screen.draw.rect(new Rect(244, 870, 150, 55), 'blue');
-  screen.draw.rect(new Rect(244, 944, 150, 55), 'blue');
 }
 
 function on_mouse_down(pos, buttons) {
