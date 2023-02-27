@@ -101,11 +101,15 @@ const YIELD_COLOR = [174, 71, 64];
  * Class containing the soil property values.
  */
 class Game {
+  static MIN_VALUE = 0;
+
+  static MAX_VALUE = 7;
+
   /*
    * Function to limit a value to [0, 7], inclusive.
    */
   static limit(value) {
-    return Math.max(0, Math.min(value, 7));
+    return Math.max(Game.MIN_VALUE, Math.min(value, Game.MAX_VALUE));
   }
 
   constructor() {
@@ -192,43 +196,43 @@ class Game {
      */
 
     // Biological
-    if (this.abundance <= 0) {
+    if (this.abundance <= Game.MIN_VALUE) {
       this.diversity--;
       this.activity--;
     }
-    if (this.diversity <= 0) {
+    if (this.diversity <= Game.MIN_VALUE) {
       this.abundance--;
       this.activity--;
     }
-    if (this.activity <= 0) {
+    if (this.activity <= Game.MIN_VALUE) {
       this.abundance--;
       this.diversity--;
     }
 
     // Physical
-    if (this.porosity <= 0) {
+    if (this.porosity <= Game.MIN_VALUE) {
       this.aggregate--;
       this.depth--;
     }
-    if (this.aggregate <= 0) {
+    if (this.aggregate <= Game.MIN_VALUE) {
       this.porosity--;
       this.depth--;
     }
-    if (this.depth <= 0) {
+    if (this.depth <= Game.MIN_VALUE) {
       this.porosity--;
       this.aggregate--;
     }
 
     // Chemical
-    if (this.acidity <= 0) {
+    if (this.acidity <= Game.MIN_VALUE) {
       this.nutrients--;
       this.organic--;
     }
-    if (this.nutrients <= 0) {
+    if (this.nutrients <= Game.MIN_VALUE) {
       this.acidity--;
       this.organic--;
     }
-    if (this.organic <= 0) {
+    if (this.organic <= Game.MIN_VALUE) {
       this.acidity--;
       this.nutrients--;
     }
@@ -238,43 +242,43 @@ class Game {
      */
 
     // Biological
-    if (this.abundance >= 7) {
+    if (this.abundance >= Game.MAX_VALUE) {
       this.diversity++;
       this.activity++;
     }
-    if (this.diversity >= 7) {
+    if (this.diversity >= Game.MAX_VALUE) {
       this.abundance++;
       this.activity++;
     }
-    if (this.activity >= 7) {
+    if (this.activity >= Game.MAX_VALUE) {
       this.abundance++;
       this.diversity++;
     }
 
     // Physical
-    if (this.porosity >= 7) {
+    if (this.porosity >= Game.MAX_VALUE) {
       this.aggregate++;
       this.depth++;
     }
-    if (this.aggregate >= 7) {
+    if (this.aggregate >= Game.MAX_VALUE) {
       this.porosity++;
       this.depth++;
     }
-    if (this.depth >= 7) {
+    if (this.depth >= Game.MAX_VALUE) {
       this.porosity++;
       this.aggregate++;
     }
 
     // Chemical
-    if (this.acidity >= 7) {
+    if (this.acidity >= Game.MAX_VALUE) {
       this.nutrients++;
       this.organic++;
     }
-    if (this.nutrients >= 7) {
+    if (this.nutrients >= Game.MAX_VALUE) {
       this.acidity++;
       this.organic++;
     }
-    if (this.organic >= 7) {
+    if (this.organic >= Game.MAX_VALUE) {
       this.acidity++;
       this.nutrients++;
     }
@@ -295,7 +299,7 @@ class Game {
   }
 
   isBreakdown() {
-    return ((this.organic === 0) || (this.activity === 7));
+    return ((this.organic === Game.MIN_VALUE) || (this.activity === Game.MAX_VALUE));
   }
 
   isFamine() {
@@ -308,9 +312,9 @@ class Game {
   }
 
   isWaterPolluted() {
-    return ((this.aggregate === 0) ||
-            (this.nutrients === 7) ||
-            (this.porosity === 7));
+    return ((this.aggregate === Game.MIN_VALUE) ||
+            (this.nutrients === Game.MAX_VALUE) ||
+            (this.porosity === Game.MAX_VALUE));
   }
 
   isLost() {
@@ -319,17 +323,17 @@ class Game {
       return true;
     }
 
-    if ((this.abundance + this.diversity + this.activity) <= 0) {
+    if ((this.abundance + this.diversity + this.activity) <= Game.MIN_VALUE) {
       // Biological failure
       return true;
     }
 
-    if ((this.porosity + this.aggregate + this.depth) <= 0) {
+    if ((this.porosity + this.aggregate + this.depth) <= Game.MIN_VALUE) {
       // Physical failure
       return true;
     }
 
-    if ((this.acidity + this.nutrients + this.organic) <= 0) {
+    if ((this.acidity + this.nutrients + this.organic) <= Game.MIN_VALUE) {
       // Chemical failure
       return true;
     }
@@ -398,8 +402,6 @@ function drawDial(center, value) {
       high = [center[0] + ((DIAL_RADIUS + 20) * Math.sin(highAngle)),
               center[1] - ((DIAL_RADIUS + 20) * Math.cos(highAngle))];
   screen.draw.filled_polygon([middle, low, high], DIAL_COLOR);
-
-  screen.draw.circle(center, DIAL_RADIUS, DIAL_COLOR);
 }
 
 function drawMessage(message) {
