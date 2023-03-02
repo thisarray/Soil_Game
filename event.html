@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Soil Game</title>
+  <script src="../jsgame0.js"></script>
+  <style type="text/css" media="screen">
+body {
+  background-color: white;
+  color: black;
+}
+.hidden {
+  display: none;
+}
+#original {
+  margin-left: 1em;
+}
+  </style>
+</head>
+
+<body>
+<section id="imageLoader" class="hidden">
+  <img class="hidden" src="images/board.png" alt="board" data-name="board">
+  <img class="hidden" src="images/event_acid.png" alt="event_acid" data-name="event_acid">
+  <img class="hidden" src="images/event_carbon.png" alt="event_carbon" data-name="event_carbon">
+  <img class="hidden" src="images/event_climate.png" alt="event_climate" data-name="event_climate">
+  <img class="hidden" src="images/event_compaction.png" alt="event_compaction" data-name="event_compaction">
+  <img class="hidden" src="images/event_contamination.png" alt="event_contamination" data-name="event_contamination">
+  <img class="hidden" src="images/event_depletion.png" alt="event_depletion" data-name="event_depletion">
+  <img class="hidden" src="images/event_desertification.png" alt="event_desertification" data-name="event_desertification">
+  <img class="hidden" src="images/event_drought.png" alt="event_drought" data-name="event_drought">
+  <img class="hidden" src="images/event_erosion.png" alt="event_erosion" data-name="event_erosion">
+  <img class="hidden" src="images/event_fertiliser.png" alt="event_fertiliser" data-name="event_fertiliser">
+  <img class="hidden" src="images/event_landuse.png" alt="event_landuse" data-name="event_landuse">
+  <img class="hidden" src="images/event_overgrazing.png" alt="event_overgrazing" data-name="event_overgrazing">
+  <img class="hidden" src="images/event_pest.png" alt="event_pest" data-name="event_pest">
+  <img class="hidden" src="images/event_pesticides.png" alt="event_pesticides" data-name="event_pesticides">
+  <img class="hidden" src="images/event_salinisation.png" alt="event_salinisation" data-name="event_salinisation">
+  <img class="hidden" src="images/event_sealing.png" alt="event_sealing" data-name="event_sealing">
+  <img class="hidden" src="images/event_waterlogging.png" alt="event_waterlogging" data-name="event_waterlogging">
+  <img class="hidden" src="images/event_wildfire.png" alt="event_wildfire" data-name="event_wildfire">
+</section>
+
+<main>
+<h1>The Soil Game</h1>
+
+<canvas id="screen">
+The game screen appears here if your browser supports the Canvas API.
+</canvas>
+<section id="controls">
+  <button type="button" id="reset">Reset</button>
+  <button type="button" id="pause">Pause</button>
+</section>
+
+<h2>Attribution</h2>
+
+<p>Based on <a href="https://soilgame.wixsite.com/free2print">Dirty Matters: The Soil Game</a>.</p>
+
+<p>Licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons license BY-NC-SA 4.0</a>.</p>
+
+</main>
+
+<script>
+WIDTH = 1550;
+HEIGHT = 1078;
+
+/*
+ * Number angle to the center of each dial petal in radians.
+ */
+const DIAL_ANGLE = Math.PI / 8;
+
+/*
+ * Map mapping the string name to the center coordinates of each dial.
+ */
+const DIAL_CENTER_MAP = new Map([
+  ['abundance', [904, 254]],
+  ['diversity', [1157, 234]],
+  ['activity', [1304, 414]],
+  ['porosity', [648, 228]],
+  ['aggregate', [645, 539]],
+  ['depth', [649, 856]],
+  ['acidity', [922, 824]],
+  ['nutrients', [1158, 836]],
+  ['organic', [1304, 665]]
+]);
+
+/*
+ * Array color for the dial marker.
+ */
+const DIAL_COLOR = [0, 173, 239];
+
+/*
+ * Integer radius of each dial in pixels.
+ */
+const DIAL_RADIUS = 110;
+
+/*
+ * Array of integer breakpoints to color in the food yield.
+ */
+const YIELD_BREAKPOINTS = [
+  // Food yield 0 through 8 across the top
+  520, 660, 770, 890, 1000, 1110, 1230, 1340, 1500,
+  // Food yield 9 through 16 down the right side
+  190, 310, 440, 560, 680, 800, 920, 1060,
+  // Food yield 17 through 24 across the bottom
+  1260, 1146, 1010, 920, 810, 670, 540, 450,
+  // Food yield 25 through 30
+  850, 710, 600, 470, 370, 330
+];
+
+/*
+ * Array color to fill in the food yield.
+ */
+const YIELD_COLOR = [174, 71, 64];
+
+/*
+ * Return a random integer N such that min <= N < max.
+ */
+function getRandomInteger(min, max) {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor((Math.random() * (max - min)) + min);
+}
+
+/*
+ * Shuffle Array x in place.
+ */
+function shuffle(x) {
+  let j, temp;
+  for (let i = x.length - 1; i > 0; i--) {
+    // pick an element in x[:i+1] with which to exchange x[i]
+    j = getRandomInteger(0, i + 1);
+    temp = x[i];
+    x[i] = x[j];
+    x[j] = temp;
+  }
+}
+
+const TAKE_CARD = new Rect(90, 548, 300, 190);
+
+/*
+ * Class for the event cards.
+ */
+class EventCard extends Actor {
+  /*
+   * name: String name of the image for the event card.
+   * deduction: Positive integer amount to deduct from each soil property.
+   * properties: Array of string names of the soil properties affected.
+   */
+  constructor(name, deduction, properties) {
+    super(name);
+
+    this.pos = [Math.floor(WIDTH / 2), Math.floor(HEIGHT / 2)];
+
+    this.deduction = deduction;
+    this.properties = properties.slice();
+  }
+}
+
+/*
+ * Class containing the soil property values.
+ */
+class Game {
+  static MIN_VALUE = 0;
+
+  static MAX_VALUE = 7;
+
+  /*
+   * Function to limit a value to [0, 7], inclusive.
+   */
+  static limit(value) {
+    return Math.max(Game.MIN_VALUE, Math.min(value, Game.MAX_VALUE));
+  }
+
+  constructor() {
+    // Biological
+    this._abundance = 2;
+    this._diversity = 2;
+    this._activity = 2;
+    // Physical
+    this._porosity = 2;
+    this._aggregate = 2;
+    this._depth = 2;
+    // Chemical
+    this._acidity = 2;
+    this._nutrients = 2;
+    this._organic = 2;
+
+    this.showEventCard = false;
+    // Array deck of event cards
+    this.events = [
+      new EventCard('event_acid', 2, ['acidity']),
+      new EventCard('event_carbon', 2, ['organic']),
+      new EventCard('event_climate', 1, ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'depth', 'acidity', 'nutrients', 'organic']),
+      new EventCard('event_compaction', 1, ['porosity', 'aggregate', 'depth']),
+      new EventCard('event_contamination', 1, ['abundance', 'diversity', 'activity', 'acidity']),
+      new EventCard('event_depletion', 2, ['nutrients']),
+      new EventCard('event_desertification', 1, ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'depth', 'acidity', 'nutrients', 'organic']),
+      new EventCard('event_drought', 1, ['abundance', 'activity', 'porosity', 'nutrients']),
+      new EventCard('event_erosion', 1, ['porosity', 'depth', 'nutrients', 'organic']),
+      new EventCard('event_fertiliser', 1, ['diversity', 'acidity', 'organic']),
+      new EventCard('event_landuse', 1, ['abundance', 'diversity', 'porosity', 'aggregate', 'depth', 'organic']),
+      new EventCard('event_overgrazing', 1, ['porosity', 'aggregate', 'depth', 'acidity', 'organic']),
+      new EventCard('event_pest', 1, ['abundance', 'diversity', 'activity']),
+      new EventCard('event_pesticides', 1, ['abundance', 'diversity']),
+      new EventCard('event_salinisation', 1, ['abundance', 'diversity', 'activity', 'aggregate', 'acidity', 'nutrients', 'organic']),
+      new EventCard('event_sealing', 2, ['porosity']),
+      new EventCard('event_waterlogging', 1, ['abundance', 'diversity', 'porosity']),
+      new EventCard('event_wildfire', 1, ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'acidity', 'nutrients', 'organic'])
+    ];
+    shuffle(this.events);
+  }
+
+  get abundance() {
+    return this._abundance;
+  }
+  set abundance(abundance) {
+    this._abundance = Game.limit(abundance);
+  }
+
+  get diversity() {
+    return this._diversity;
+  }
+  set diversity(diversity) {
+    this._diversity = Game.limit(diversity);
+  }
+
+  get activity() {
+    return this._activity;
+  }
+  set activity(activity) {
+    this._activity = Game.limit(activity);
+  }
+
+  get porosity() {
+    return this._porosity;
+  }
+  set porosity(porosity) {
+    this._porosity = Game.limit(porosity);
+  }
+
+  get aggregate() {
+    return this._aggregate;
+  }
+  set aggregate(aggregate) {
+    this._aggregate = Game.limit(aggregate);
+  }
+
+  get depth() {
+    return this._depth;
+  }
+  set depth(depth) {
+    this._depth = Game.limit(depth);
+  }
+
+  get acidity() {
+    return this._acidity;
+  }
+  set acidity(acidity) {
+    this._acidity = Game.limit(acidity);
+  }
+
+  get nutrients() {
+    return this._nutrients;
+  }
+  set nutrients(nutrients) {
+    this._nutrients = Game.limit(nutrients);
+  }
+
+  get organic() {
+    return this._organic;
+  }
+  set organic(organic) {
+    this._organic = Game.limit(organic);
+  }
+
+  cascade() {
+    /*
+     * Negative cascade
+     */
+
+    // Biological
+    if (this.abundance <= Game.MIN_VALUE) {
+      this.diversity--;
+      this.activity--;
+    }
+    if (this.diversity <= Game.MIN_VALUE) {
+      this.abundance--;
+      this.activity--;
+    }
+    if (this.activity <= Game.MIN_VALUE) {
+      this.abundance--;
+      this.diversity--;
+    }
+
+    // Physical
+    if (this.porosity <= Game.MIN_VALUE) {
+      this.aggregate--;
+      this.depth--;
+    }
+    if (this.aggregate <= Game.MIN_VALUE) {
+      this.porosity--;
+      this.depth--;
+    }
+    if (this.depth <= Game.MIN_VALUE) {
+      this.porosity--;
+      this.aggregate--;
+    }
+
+    // Chemical
+    if (this.acidity <= Game.MIN_VALUE) {
+      this.nutrients--;
+      this.organic--;
+    }
+    if (this.nutrients <= Game.MIN_VALUE) {
+      this.acidity--;
+      this.organic--;
+    }
+    if (this.organic <= Game.MIN_VALUE) {
+      this.acidity--;
+      this.nutrients--;
+    }
+
+    /*
+     * Positive cascade
+     */
+
+    // Biological
+    if (this.abundance >= Game.MAX_VALUE) {
+      this.diversity++;
+      this.activity++;
+    }
+    if (this.diversity >= Game.MAX_VALUE) {
+      this.abundance++;
+      this.activity++;
+    }
+    if (this.activity >= Game.MAX_VALUE) {
+      this.abundance++;
+      this.diversity++;
+    }
+
+    // Physical
+    if (this.porosity >= Game.MAX_VALUE) {
+      this.aggregate++;
+      this.depth++;
+    }
+    if (this.aggregate >= Game.MAX_VALUE) {
+      this.porosity++;
+      this.depth++;
+    }
+    if (this.depth >= Game.MAX_VALUE) {
+      this.porosity++;
+      this.aggregate++;
+    }
+
+    // Chemical
+    if (this.acidity >= Game.MAX_VALUE) {
+      this.nutrients++;
+      this.organic++;
+    }
+    if (this.nutrients >= Game.MAX_VALUE) {
+      this.acidity++;
+      this.organic++;
+    }
+    if (this.organic >= Game.MAX_VALUE) {
+      this.acidity++;
+      this.nutrients++;
+    }
+  }
+
+  get foodYield() {
+    let foodYield = 0;
+    foodYield += this.abundance;
+    foodYield += this.diversity;
+    foodYield += this.activity;
+    foodYield += this.porosity;
+    foodYield += this.aggregate;
+    foodYield += this.depth;
+    foodYield += this.acidity;
+    foodYield += this.nutrients;
+    foodYield += this.organic;
+    return foodYield;
+  }
+
+  isBreakdown() {
+    return ((this.organic === Game.MIN_VALUE) || (this.activity === Game.MAX_VALUE));
+  }
+
+  isFamine() {
+    let foodYield = this.foodYield;
+    return ((foodYield === 16) ||
+            (foodYield === 18) ||
+            (foodYield === 21) ||
+            (foodYield === 25) ||
+            (foodYield === 28));
+  }
+
+  isWaterPolluted() {
+    return ((this.aggregate === Game.MIN_VALUE) ||
+            (this.nutrients === Game.MAX_VALUE) ||
+            (this.porosity === Game.MAX_VALUE));
+  }
+
+  isLost() {
+    if (this.isBreakdown() && this.isFamine() && this.isWaterPolluted()) {
+      // If all 3 Catastrophes occurred
+      return true;
+    }
+
+    if ((this.abundance + this.diversity + this.activity) <= Game.MIN_VALUE) {
+      // Biological failure
+      return true;
+    }
+
+    if ((this.porosity + this.aggregate + this.depth) <= Game.MIN_VALUE) {
+      // Physical failure
+      return true;
+    }
+
+    if ((this.acidity + this.nutrients + this.organic) <= Game.MIN_VALUE) {
+      // Chemical failure
+      return true;
+    }
+
+    return false;
+  }
+
+  isWon() {
+    return ((!this.isLost()) && (this.foodYield >= 30));
+  }
+
+  takeEventCard() {
+    let event = this.events[0];
+    for (let p of event.properties) {
+      this[p] -= event.deduction;
+    }
+    this.showEventCard = true;
+  }
+
+  dismissEventCard() {
+    this.showEventCard = false;
+    // Move the card to the bottom of the deck
+    let event = this.events.shift();
+    this.events.push(event);
+  }
+
+  drawEventCard() {
+    if (this.showEventCard) {
+      let color = YIELD_COLOR.slice();
+      color.push(127);
+      screen.draw.filled_rect(screen.bounds(), color);
+      this.events[0].draw();
+    }
+  }
+
+  drawFoodYield() {
+    let foodYield = this.foodYield,
+        breakpoint;
+    if (foodYield <= 0) {
+      return;
+    }
+
+    if (foodYield < 30) {
+      breakpoint = YIELD_BREAKPOINTS[foodYield];
+    }
+    else {
+      breakpoint = YIELD_BREAKPOINTS[30];
+    }
+
+    if (foodYield < 9) {
+      screen.draw.filled_polygon([[YIELD_BREAKPOINTS[0], 40], [breakpoint, 40], [breakpoint, 105], [550, 105]], YIELD_COLOR);
+      return;
+    }
+
+    screen.draw.filled_polygon([[YIELD_BREAKPOINTS[0], 40], [YIELD_BREAKPOINTS[8], 40], [YIELD_BREAKPOINTS[8], 105], [550, 105]], YIELD_COLOR);
+    if (foodYield < 17) {
+      screen.draw.filled_rect(new Rect(1415, 40, 80, breakpoint - 40), YIELD_COLOR);
+      return;
+    }
+
+    screen.draw.filled_rect(new Rect(1415, 40, 80, YIELD_BREAKPOINTS[16] - 40), YIELD_COLOR);
+    if (foodYield < 25) {
+      screen.draw.filled_rect(new Rect(breakpoint, 977, 1495 - breakpoint, 80), YIELD_COLOR);
+      return;
+    }
+
+    screen.draw.filled_rect(new Rect(YIELD_BREAKPOINTS[24], 977, 1495 - YIELD_BREAKPOINTS[24], 80), YIELD_COLOR);
+
+    screen.draw.filled_rect(new Rect(428, breakpoint, 90, 1060 - breakpoint), YIELD_COLOR);
+  }
+}
+
+let game;
+
+function reset() {
+  game = new Game();
+}
+
+/*
+ * Draw the soil property dial centered at center with value indicated.
+ */
+function drawDial(center, value) {
+  let angle = ((value * 2) + 1) * DIAL_ANGLE,
+      lowAngle = angle - (DIAL_ANGLE / 2),
+      highAngle = angle + (DIAL_ANGLE / 2),
+      middle = [center[0] + ((DIAL_RADIUS - 10) * Math.sin(angle)),
+               center[1] - ((DIAL_RADIUS - 10) * Math.cos(angle))],
+      low = [center[0] + ((DIAL_RADIUS + 20) * Math.sin(lowAngle)),
+             center[1] - ((DIAL_RADIUS + 20) * Math.cos(lowAngle))],
+      high = [center[0] + ((DIAL_RADIUS + 20) * Math.sin(highAngle)),
+              center[1] - ((DIAL_RADIUS + 20) * Math.cos(highAngle))];
+  screen.draw.filled_polygon([middle, low, high], DIAL_COLOR);
+}
+
+function drawMessage(message) {
+  screen.draw.text(message, {
+    center: [1010, 550],
+    color: YIELD_COLOR,
+    fontsize: 64
+  });
+}
+
+function draw() {
+  screen.clear('white');
+  game.drawFoodYield();
+  screen.blit('board', [0, 0]);
+
+  for (let [property, center] of DIAL_CENTER_MAP) {
+    drawDial(center, game[property]);
+  }
+
+  if (game.isFamine()) {
+    screen.draw.rect(new Rect(244, 800, 150, 55), DIAL_COLOR, 2);
+  }
+  if (game.isWaterPolluted()) {
+    screen.draw.rect(new Rect(244, 870, 150, 55), DIAL_COLOR, 2);
+  }
+  if (game.isBreakdown()) {
+    screen.draw.rect(new Rect(244, 944, 150, 55), DIAL_COLOR, 2);
+  }
+
+  if (game.isLost()) {
+    drawMessage('YOU\nLOST');
+  }
+  if (game.isWon()) {
+    drawMessage('YOU\nWON');
+  }
+
+  screen.draw.rect(TAKE_CARD, 'blue');
+  screen.draw.filled_rect(TAKE_CARD, 'white');
+  screen.draw.text('Draw\nEvent\nCard', {
+    center: TAKE_CARD.center,
+    color: YIELD_COLOR,
+    fontsize: 48
+  });
+
+  game.drawEventCard();
+}
+
+function on_mouse_down(pos, buttons) {
+  console.log(pos);
+
+  if (game.showEventCard) {
+    game.dismissEventCard();
+    return;
+  }
+
+  if (TAKE_CARD.collidepoint(pos)) {
+    game.cascade();
+    game.takeEventCard();
+    return;
+  }
+
+  for (let [property, center] of DIAL_CENTER_MAP) {
+    if (Math.hypot(pos[0] - center[0], pos[1] - center[1]) < DIAL_RADIUS) {
+      if ((buttons & mouse.LEFT) > 0) {
+        game[property]++;
+      }
+      else if ((buttons & mouse.RIGHT) > 0) {
+        game[property]--;
+      }
+    }
+  }
+}
+
+window.addEventListener('load', (event) => {
+  screen.init();
+});
+</script>
+</body>
+
+</html>
