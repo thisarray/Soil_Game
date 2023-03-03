@@ -442,8 +442,7 @@ class Game {
   dismissEventCard() {
     this.showEventCard = false;
     // Move the card to the bottom of the deck
-    let event = this.events.shift();
-    this.events.push(event);
+    this.events.push(this.events.shift());
   }
 
   drawEventCard() {
