@@ -41,6 +41,20 @@ body {
   <img class="hidden" src="images/event_sealing.png" alt="event_sealing" data-name="event_sealing">
   <img class="hidden" src="images/event_waterlogging.png" alt="event_waterlogging" data-name="event_waterlogging">
   <img class="hidden" src="images/event_wildfire.png" alt="event_wildfire" data-name="event_wildfire">
+  <img class="hidden" src="images/power_biochar.png" alt="power_biochar" data-name="power_biochar">
+  <img class="hidden" src="images/power_biosolids.png" alt="power_biosolids" data-name="power_biosolids">
+  <img class="hidden" src="images/power_compost.png" alt="power_compost" data-name="power_compost">
+  <img class="hidden" src="images/power_cover.png" alt="power_cover" data-name="power_cover">
+  <img class="hidden" src="images/power_digestate.png" alt="power_digestate" data-name="power_digestate">
+  <img class="hidden" src="images/power_grazing.png" alt="power_grazing" data-name="power_grazing">
+  <img class="hidden" src="images/power_intercrop.png" alt="power_intercrop" data-name="power_intercrop">
+  <img class="hidden" src="images/power_lime.png" alt="power_lime" data-name="power_lime">
+  <img class="hidden" src="images/power_manure.png" alt="power_manure" data-name="power_manure">
+  <img class="hidden" src="images/power_microbial.png" alt="power_microbial" data-name="power_microbial">
+  <img class="hidden" src="images/power_mulches.png" alt="power_mulches" data-name="power_mulches">
+  <img class="hidden" src="images/power_plant.png" alt="power_plant" data-name="power_plant">
+  <img class="hidden" src="images/power_rotation.png" alt="power_rotation" data-name="power_rotation">
+  <img class="hidden" src="images/power_tillage.png" alt="power_tillage" data-name="power_tillage">
 </section>
 
 <main>
@@ -138,24 +152,45 @@ function shuffle(x) {
   }
 }
 
-const TAKE_EVENT = new Rect(90, 548, 300, 190);
+const State = Object.freeze({
+  BOARD: 0,
+  EVENT: 1,
+  POWER: 2
+});
+
+const TAKE_EVENT = new Rect(90, 548, 150, 190);
+
+const USE_POWER = new Rect(240, 548, 150, 190);
+
+/*
+ * Class for the soil power cards.
+ */
+class Card extends Actor {
+  /*
+   * name: String name of the image for the card.
+   * properties: Array of string names of the soil properties affected.
+   * delta: Integer change to each soil property. Defaults to 1.
+   */
+  constructor(name, properties, delta = 1) {
+    super(name);
+
+    this.delta = delta;
+    this.properties = properties.slice();
+  }
+}
 
 /*
  * Class for the event cards.
  */
-class EventCard extends Actor {
+class EventCard extends Card {
   /*
    * name: String name of the image for the event card.
-   * deduction: Positive integer amount to deduct from each soil property.
    * properties: Array of string names of the soil properties affected.
+   * delta: Integer change to each soil property.
    */
-  constructor(name, deduction, properties) {
-    super(name);
-
+  constructor(name, properties, delta) {
+    super(name, properties, delta);
     this.pos = [Math.floor(WIDTH / 2), Math.floor(HEIGHT / 2)];
-
-    this.deduction = deduction;
-    this.properties = properties.slice();
   }
 }
 
@@ -188,29 +223,78 @@ class Game {
     this._nutrients = 2;
     this._organic = 2;
 
-    this.showEventCard = false;
+    this.state = State.BOARD;
+
     // Array deck of event cards
     this.events = [
-      new EventCard('event_acid', 2, ['acidity']),
-      new EventCard('event_carbon', 2, ['organic']),
-      new EventCard('event_climate', 1, ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'depth', 'acidity', 'nutrients', 'organic']),
-      new EventCard('event_compaction', 1, ['porosity', 'aggregate', 'depth']),
-      new EventCard('event_contamination', 1, ['abundance', 'diversity', 'activity', 'acidity']),
-      new EventCard('event_depletion', 2, ['nutrients']),
-      new EventCard('event_desertification', 1, ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'depth', 'acidity', 'nutrients', 'organic']),
-      new EventCard('event_drought', 1, ['abundance', 'activity', 'porosity', 'nutrients']),
-      new EventCard('event_erosion', 1, ['porosity', 'depth', 'nutrients', 'organic']),
-      new EventCard('event_fertiliser', 1, ['diversity', 'acidity', 'organic']),
-      new EventCard('event_landuse', 1, ['abundance', 'diversity', 'porosity', 'aggregate', 'depth', 'organic']),
-      new EventCard('event_overgrazing', 1, ['porosity', 'aggregate', 'depth', 'acidity', 'organic']),
-      new EventCard('event_pest', 1, ['abundance', 'diversity', 'activity']),
-      new EventCard('event_pesticides', 1, ['abundance', 'diversity']),
-      new EventCard('event_salinisation', 1, ['abundance', 'diversity', 'activity', 'aggregate', 'acidity', 'nutrients', 'organic']),
-      new EventCard('event_sealing', 2, ['porosity']),
-      new EventCard('event_waterlogging', 1, ['abundance', 'diversity', 'porosity']),
-      new EventCard('event_wildfire', 1, ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'acidity', 'nutrients', 'organic'])
+      new EventCard('event_acid', ['acidity'], -2),
+      new EventCard('event_carbon', ['organic'], -2),
+      new EventCard('event_climate', ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'depth', 'acidity', 'nutrients', 'organic'], -1),
+      new EventCard('event_compaction', ['porosity', 'aggregate', 'depth'], -1),
+      new EventCard('event_contamination', ['abundance', 'diversity', 'activity', 'acidity'], -1),
+      new EventCard('event_depletion', ['nutrients'], -2),
+      new EventCard('event_desertification', ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'depth', 'acidity', 'nutrients', 'organic'], -1),
+      new EventCard('event_drought', ['abundance', 'activity', 'porosity', 'nutrients'], -1),
+      new EventCard('event_erosion', ['porosity', 'depth', 'nutrients', 'organic'], -1),
+      new EventCard('event_fertiliser', ['diversity', 'acidity', 'organic'], -1),
+      new EventCard('event_landuse', ['abundance', 'diversity', 'porosity', 'aggregate', 'depth', 'organic'], -1),
+      new EventCard('event_overgrazing', ['porosity', 'aggregate', 'depth', 'acidity', 'organic'], -1),
+      new EventCard('event_pest', ['abundance', 'diversity', 'activity'], -1),
+      new EventCard('event_pesticides', ['abundance', 'diversity'], -1),
+      new EventCard('event_salinisation', ['abundance', 'diversity', 'activity', 'aggregate', 'acidity', 'nutrients', 'organic'], -1),
+      new EventCard('event_sealing', ['porosity'], -2),
+      new EventCard('event_waterlogging', ['abundance', 'diversity', 'porosity'], -1),
+      new EventCard('event_wildfire', ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'acidity', 'nutrients', 'organic'], -1)
     ];
     shuffle(this.events);
+
+    // Array deck of soil power cards
+    this.powers = [];
+    for (let i = 0; i < 4; i++) {
+      this.powers.push(new Card('power_biochar', ['abundance', 'porosity', 'nutrients', 'organic']));
+    }
+    for (let i = 0; i < 3; i++) {
+      this.powers.push(new Card('power_biosolids', ['activity', 'porosity', 'aggregate', 'depth', 'nutrients', 'organic']));
+    }
+    for (let i = 0; i < 3; i++) {
+      this.powers.push(new Card('power_compost', ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'depth', 'acidity', 'nutrients', 'organic']));
+    }
+    for (let i = 0; i < 2; i++) {
+      this.powers.push(new Card('power_cover', ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'depth', 'nutrients', 'organic']));
+    }
+    for (let i = 0; i < 4; i++) {
+      this.powers.push(new Card('power_digestate', ['abundance', 'diversity', 'depth', 'nutrients', 'organic']));
+    }
+    for (let i = 0; i < 4; i++) {
+      this.powers.push(new Card('power_grazing', ['diversity', 'aggregate', 'nutrients']));
+    }
+    for (let i = 0; i < 4; i++) {
+      this.powers.push(new Card('power_intercrop', ['abundance', 'diversity', 'nutrients', 'organic']));
+    }
+    for (let i = 0; i < 6; i++) {
+      this.powers.push(new Card('power_lime', ['acidity']));
+    }
+    for (let i = 0; i < 2; i++) {
+      this.powers.push(new Card('power_manure', ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'depth', 'nutrients', 'organic']));
+    }
+    for (let i = 0; i < 4; i++) {
+      this.powers.push(new Card('power_microbial', ['nutrients']));
+    }
+    for (let i = 0; i < 2; i++) {
+      this.powers.push(new Card('power_mulches', ['abundance', 'diversity', 'activity', 'porosity', 'depth', 'nutrients', 'organic']));
+    }
+    for (let i = 0; i < 2; i++) {
+      this.powers.push(new Card('power_plant', ['abundance', 'diversity', 'activity', 'porosity', 'depth', 'nutrients', 'organic']));
+    }
+    for (let i = 0; i < 4; i++) {
+      this.powers.push(new Card('power_rotation', ['abundance', 'diversity', 'activity', 'nutrients']));
+    }
+    for (let i = 0; i < 4; i++) {
+      this.powers.push(new Card('power_tillage', ['abundance', 'porosity', 'aggregate', 'nutrients', 'organic']));
+    }
+    shuffle(this.powers);
+
+    this.discardPile = [];
   }
 
   get abundance() {
@@ -431,27 +515,22 @@ class Game {
     return ((!this.isLost()) && (this.foodYield >= 30));
   }
 
-  takeEventCard() {
-    let event = this.events[0];
-    for (let p of event.properties) {
-      this[p] -= event.deduction;
+  applyCard(card) {
+    for (let p of card.properties) {
+      this[p] += card.delta;
     }
-    this.showEventCard = true;
+  }
+
+  takeEventCard() {
+    this.applyCard(this.events[0]);
+    this.cascade();
+    this.state = State.EVENT;
   }
 
   dismissEventCard() {
-    this.showEventCard = false;
+    this.state = State.BOARD;
     // Move the card to the bottom of the deck
     this.events.push(this.events.shift());
-  }
-
-  drawEventCard() {
-    if (this.showEventCard) {
-      let color = YIELD_COLOR.slice();
-      color.push(127);
-      screen.draw.filled_rect(screen.bounds(), color);
-      this.events[0].draw();
-    }
   }
 
   drawFoodYield() {
@@ -491,10 +570,11 @@ class Game {
   }
 }
 
-let game;
+let game, hand;
 
 function reset() {
   game = new Game();
+  hand = [];
 }
 
 /*
@@ -519,6 +599,51 @@ function drawMessage(message) {
     color: YIELD_COLOR,
     fontsize: 64
   });
+}
+
+function drawOverlay() {
+  let color = YIELD_COLOR.slice();
+  color.push(127);
+  screen.draw.filled_rect(screen.bounds(), color);
+}
+
+/*
+ * Position the cards in hand for display.
+ */
+function layoutHand(hand, columnCount = 5) {
+  if (hand.length <= 0) {
+    return;
+  }
+
+  let cardWidth = hand[0].width,
+      cardHeight = hand[0].height,
+      horizontalGutter = Math.floor((WIDTH - (columnCount * cardWidth)) / (columnCount + 1)),
+      i = 0,
+      rowCount, verticalGutter, x, y;
+
+  if (hand.length <= columnCount) {
+    rowCount = 1;
+  }
+  else if (hand.length <= (columnCount * 2)) {
+    rowCount = 2;
+  }
+  else {
+    rowCount = 3;
+  }
+  verticalGutter = Math.floor((HEIGHT - (rowCount * cardHeight)) / (rowCount + 1));
+
+  y = verticalGutter;
+  for (let r = 0; r < rowCount; r++) {
+    x = horizontalGutter;
+    for (let c = 0; c < columnCount; c++) {
+      if (i < hand.length) {
+        hand[i].topleft = [x, y];
+      }
+      x += cardWidth + horizontalGutter;
+      i++;
+    }
+    y += cardHeight + verticalGutter;
+  }
 }
 
 function draw() {
@@ -555,20 +680,62 @@ function draw() {
     fontsize: 48
   });
 
-  game.drawEventCard();
+  screen.draw.filled_rect(USE_POWER, 'white');
+  screen.draw.rect(USE_POWER, 'blue');
+  screen.draw.text('Use\nSoil\nPower', {
+    center: USE_POWER.center,
+    color: YIELD_COLOR,
+    fontsize: 48
+  });
+
+
+  if (game.state === State.EVENT) {
+    drawOverlay();
+    game.events[0].draw();
+  }
+  if (game.state === State.POWER) {
+    drawOverlay();
+    for (let c of hand) {
+      c.draw();
+    }
+  }
 }
 
 function on_mouse_down(pos, buttons) {
   console.log(pos);
 
-  if (game.showEventCard) {
+  if (game.state === State.EVENT) {
     game.dismissEventCard();
+    return;
+  }
+
+  if (game.state === State.POWER) {
+    // Look for the card in hand that the user clicked
+    let i = 0,
+        card;
+    for (let c of hand.slice()) {
+      if (c.collidepoint(pos)) {
+        card = hand.splice(i, 1)[0];
+        game.applyCard(card);
+        game.discardPile.push(card);
+        layoutHand(hand);
+        break;
+      }
+      i++;
+    }
+    game.state = State.BOARD;
     return;
   }
 
   if (TAKE_EVENT.collidepoint(pos)) {
     game.takeEventCard();
-    game.cascade();
+    hand.push(game.powers.shift());
+    layoutHand(hand);
+    return;
+  }
+
+  if (USE_POWER.collidepoint(pos)) {
+    game.state = State.POWER;
     return;
   }
 
