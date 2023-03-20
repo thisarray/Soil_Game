@@ -287,7 +287,7 @@ class Token extends Actor {
   isDone() {
     if (this.actionCount >= Token.ACTION_LIMIT) {
       if ((this.moveCount > 0) && (this.moveCount < this.speed)) {
-        // If the character has not used up all its moves
+        // If the character can still move
         return false;
       }
       return true;
@@ -296,17 +296,7 @@ class Token extends Actor {
   }
 
   reset() {
-    if (this.isMole()) {
-      if (this.game.carryToken instanceof Token) {
-        this.availableAbilities = ['Drop ' + this.game.carryToken.name.substring(6)];
-      }
-      else {
-        this.availableAbilities = ['Carry a character'];
-      }
-    }
-    else {
-      this.availableAbilities = this.abilities.slice();
-    }
+    this.availableAbilities = this.abilities.slice();
     this.actionCount = 0;
     this.moveCount = 0;
   }
@@ -329,7 +319,7 @@ class Token extends Actor {
     }
 
     let neighbors = Token.DIAL_NEIGHBORS.get(this.location),
-        tokens = this.game.tokens.filter(t => (t.location === location));
+        tokens = this.game.getTokensAt(location);
     if (!neighbors.includes(location)) {
       return;
     }
@@ -362,7 +352,7 @@ class Token extends Actor {
   }
 
   useAbility(index) {
-    if (this.isDone()) {
+    if (this.actionCount >= Token.ACTION_LIMIT) {
       return;
     }
     if (index < 0) {
@@ -408,17 +398,6 @@ class Token extends Actor {
       }
       return;
     }
-
-    if (this.isMole()) {
-      let tokens = this.game.tokens.filter(t => ((t.location === this.location) &&
-                                                 (!t.isMole()) && (!t.isEarthworm())));
-      if (tokens.length > 0) {
-        if (this.game.carryToken == null) {
-          this.game.carryToken = tokens[0];
-          this.actionCount++;
-        }
-      }
-    }
   }
 
   takePowerCard() {
@@ -431,7 +410,7 @@ class Token extends Actor {
   }
 
   usePowerCard(index) {
-    if (this.isDone()) {
+    if (this.actionCount >= Token.ACTION_LIMIT) {
       return;
     }
     if (this.location.length <= 0) {
@@ -742,6 +721,16 @@ class Game {
     return this.tokens[this.index];
   }
 
+  /*
+   * Return an array of tokens currently at location.
+   */
+  getTokensAt(location) {
+    if (!Token.DIAL_NEIGHBORS.has(location)) {
+      return [];
+    }
+    return this.tokens.filter(t => (t.location === location));
+  }
+
   isBreakdown() {
     return ((this.organic <= Game.MIN_VALUE) || (this.activity >= Game.MAX_VALUE));
   }
@@ -805,6 +794,9 @@ class Game {
     this.events.push(this.events.shift());
   }
 
+  /*
+   * The Mole eats the Earthworm because they are at the same location.
+   */
   eatEarthworm() {
     if (this.currentToken.isEarthworm()) {
       this.tokens.splice(this.index, 1);
@@ -824,6 +816,7 @@ class Game {
   }
 
   nextToken() {
+    this.carryToken = null;
     if (this.index < (this.tokens.length - 1)) {
       this.index++;
     }
@@ -904,7 +897,7 @@ function drawDial(center, value) {
  * Draw the character tokens at location centered at center.
  */
 function drawTokens(game, location, center) {
-  let tokens = game.tokens.filter(t => (t.location === location));
+  let tokens = game.getTokensAt(location);
   for (let i = 0; i < tokens.length; i++) {
     tokens[i].center = [center[0] + TOKEN_DELTAS[i][0], center[1] + TOKEN_DELTAS[i][1]];
     if (tokens[i] == game.carryToken) {
@@ -997,12 +990,15 @@ function draw() {
    */
   screen.draw.filled_rect(new Rect(90, 548, 300, 190), 'white');
 
-  screen.draw.rect(USE_SOIL, DIAL_COLOR);
-  screen.draw.text('Use Soil Power Card', {
-    midleft: [USE_SOIL.left + 10, USE_SOIL.centery],
-    color: YIELD_COLOR,
-    fontsize: 18
-  });
+
+  if (game.currentToken.actionCount < Token.ACTION_LIMIT) {
+    screen.draw.rect(USE_SOIL, DIAL_COLOR);
+    screen.draw.text('Use Soil Power Card', {
+      midleft: [USE_SOIL.left + 10, USE_SOIL.centery],
+      color: YIELD_COLOR,
+      fontsize: 18
+    });
+  }
 
   let abilities = game.currentToken.availableAbilities;
   if (abilities.length > 0) {
@@ -1093,14 +1089,54 @@ function on_mouse_down(pos, buttons) {
   }
 
   if (USE_SOIL.collidepoint(pos)) {
-    drawHand = 'Pick a Soil Power card to use';
-    return;
+    if (game.currentToken.actionCount < Token.ACTION_LIMIT) {
+      drawHand = 'Pick a Soil Power card to use';
+      return;
+    }
   }
 
   let abilities = game.currentToken.availableAbilities;
   if (abilities.length > 0) {
+    if (game.currentToken.isMole()) {
+      if (abilities[0] === 'Pick a token to carry') {
+        let tokens = game.getTokensAt(game.currentToken.location);
+        tokens = tokens.filter(t => ((!t.isMole()) && (!t.isEarthworm())));
+        for (let t of tokens) {
+          if (t.collidepoint(pos)) {
+            game.carryToken = t;
+            game.currentToken.availableAbilities = ['Drop ' + game.carryToken.name.substring(6)];
+            game.currentToken.actionCount++;
+            return;
+          }
+        }
+      }
+    }
+
     if (ABILITY_1.collidepoint(pos)) {
-      game.currentToken.useAbility(0);
+      if (game.currentToken.isMole()) {
+        if (game.carryToken instanceof Token) {
+          // Drop the token Mole was carrying
+          game.carryToken = null;
+          game.currentToken.availableAbilities = [];
+        }
+        else {
+          let tokens = game.getTokensAt(game.currentToken.location);
+          tokens = tokens.filter(t => ((!t.isMole()) && (!t.isEarthworm())));
+          if (tokens.length > 0) {
+            if (tokens.length === 1) {
+              game.carryToken = tokens[0];
+              game.currentToken.availableAbilities = ['Drop ' + game.carryToken.name.substring(6)];
+              game.currentToken.actionCount++;
+            }
+            else {
+              game.currentToken.availableAbilities = ['Pick a token to carry'];
+            }
+          }
+        }
+      }
+      else {
+        game.currentToken.useAbility(0);
+      }
       if (game.currentToken.isDone()) {
         game.nextToken();
       }
