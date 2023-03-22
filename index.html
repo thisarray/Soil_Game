@@ -91,12 +91,12 @@ WIDTH = 1550;
 HEIGHT = 1078;
 
 /*
- * Number angle to the center of each dial petal in radians.
+ * Number angle in radians to the center of each dial petal.
  */
 const DIAL_ANGLE = Math.PI / 8;
 
 /*
- * Map mapping a string soil property to the array integer center coordinates of each dial.
+ * Map mapping a string soil property to the array integer center coordinates of its dial.
  */
 const DIAL_CENTER_MAP = new Map([
   ['abundance', [904, 254]],
@@ -121,38 +121,6 @@ const DIAL_COLOR = [0, 173, 239];
 const DIAL_RADIUS = 110;
 
 /*
- * Array integer coordinates of the blank starting area.
- */
-const STARTING_AREA = [1010, 550];
-
-/*
- * Rect object for the use soil power card button.
- */
-const USE_SOIL = new Rect(90, 554, 300, 40);
-
-/*
- * Rect object for the ability 1 button.
- */
-const ABILITY_1 = new Rect(90, 600, 300, 40);
-
-/*
- * Rect object for the ability 2 button.
- */
-const ABILITY_2 = new Rect(90, 646, 300, 40);
-
-/*
- * Rect object for the end turn button.
- */
-const END_TURN = new Rect(90, 692, 300, 40);
-
-/*
- * Array integer offsets relative to a center to position each token.
- */
-const TOKEN_DELTAS = [
-  [-60, -60], [0, -60], [60, -60], [60, 60], [0, 60], [-60, 60]
-];
-
-/*
  * Array of integer breakpoints to color in the food yield.
  */
 const YIELD_BREAKPOINTS = [
@@ -170,6 +138,53 @@ const YIELD_BREAKPOINTS = [
  * Array color to fill in the food yield.
  */
 const YIELD_COLOR = [174, 71, 64];
+
+/*
+ * Array integer coordinates of the blank starting area.
+ */
+const STARTING_AREA = [1010, 550];
+
+/*
+ * Array integer offsets relative to a center to position each token.
+ */
+const TOKEN_DELTAS = [
+  [-60, -60], [0, -60], [60, -60], [60, 60], [0, 60], [-60, 60]
+];
+
+/*
+ * Array of Rect objects that act as buttons for the current character's abilities.
+ */
+const BUTTONS = [
+  new Rect(90, 554, 300, 40),
+  new Rect(90, 600, 300, 40),
+  new Rect(90, 646, 300, 40),
+  new Rect(90, 692, 300, 40)
+];
+
+/*
+ * String label for the soil power card button.
+ */
+const POWER_LABEL = 'Use Soil Power Card';
+
+/*
+ * String label for the end turn button.
+ */
+const END_LABEL = 'End Turn';
+
+/*
+ * String label for the pick a token to carry button.
+ */
+const CARRY_PICK_LABEL = 'Pick a token to carry';
+
+/*
+ * String label for the pick a token to swap button.
+ */
+const SWAP_PICK_LABEL = 'Pick a token to swap';
+
+/*
+ * String label for the swap a card button.
+ */
+const SWAP_LABEL = 'Swap a card';
 
 /*
  * Return a random integer N such that min <= N < max.
@@ -200,14 +215,14 @@ function shuffle(x) {
 class Card extends Actor {
   /*
    * name: String name of the image for the card.
-   * properties: Array of string names of the soil properties affected.
+   * properties: Array of string soil properties affected.
    * delta: Integer change to each soil property. Defaults to 1.
    */
   constructor(name, properties, delta = 1) {
     super(name);
 
-    this.delta = delta;
     this.properties = properties.slice();
+    this.delta = delta;
   }
 }
 
@@ -217,7 +232,7 @@ class Card extends Actor {
 class EventCard extends Card {
   /*
    * name: String name of the image for the event card.
-   * properties: Array of string names of the soil properties affected.
+   * properties: Array of string soil properties affected.
    * delta: Integer change to each soil property.
    */
   constructor(name, properties, delta) {
@@ -231,7 +246,7 @@ class EventCard extends Card {
  */
 class Token extends Actor {
   /*
-   * Integer number of actions a character can take per round.
+   * Integer number of actions a character can take per turn.
    */
   static ACTION_LIMIT = 2;
 
@@ -295,12 +310,52 @@ class Token extends Actor {
     return false;
   }
 
+  /*
+   * Reset this Token instance for a new round.
+   */
   reset() {
-    this.availableAbilities = this.abilities.slice();
+    this.actions = this.abilities.slice();
+    this.actions.unshift(POWER_LABEL);
+    this.actions.push(END_LABEL);
     this.actionCount = 0;
     this.moveCount = 0;
   }
 
+  /*
+   * Remove action from the array of actions with optional replacement.
+   */
+  removeAction(action, replacement = '') {
+    let index = this.actions.indexOf(action);
+    if (index < 0) {
+      return;
+    }
+    if ((typeof replacement === 'string') && (replacement.length > 0)) {
+      this.actions[index] = replacement;
+    }
+    else {
+      this.actions.splice(index, 1);
+    }
+  }
+
+  /*
+   * Remove actions this Token instance is no longer allowed.
+   */
+  checkDone() {
+    if (this.actionCount >= Token.ACTION_LIMIT) {
+      this.removeAction(POWER_LABEL);
+      for (let a of this.abilities) {
+        this.removeAction(a);
+      }
+    }
+
+    if (this.isDone()) {
+      this.game.nextToken();
+    }
+  }
+
+  /*
+   * Move this Token instance to location if possible.
+   */
   move(location) {
     if (this.isDone()) {
       return;
@@ -323,19 +378,19 @@ class Token extends Actor {
     if (!neighbors.includes(location)) {
       return;
     }
-    if (this.isNematode() && tokens.some(t => (t.speed === 1))) {
-      // Nematode cannot go where microbes (speed === 1) are
+    if (this.isNematode() && tokens.some(t => t.isMicrobe())) {
+      // Nematode cannot go where microbes are
       return;
     }
     if (this.isEarthworm()) {
       if (tokens.some(t => t.isMole())) {
-        // Earthworm is eaten if it goes where the Mole is
+        // The Earthworm is eaten if it goes where the Mole is
         this.game.eatEarthworm();
       }
     }
     if (this.isMole()) {
       if (tokens.some(t => t.isEarthworm())) {
-        // Mole eats the Earthworm if it is at location
+        // The Mole eats the Earthworm if it is at location
         this.game.eatEarthworm();
       }
       if (this.game.carryToken instanceof Token) {
@@ -346,60 +401,89 @@ class Token extends Actor {
     this.location = location;
     if (this.moveCount <= 0) {
       // Only count move as an action on the first move
+      // Otherwise, characters with speed > 1 will have actions counted incorrectly
       this.actionCount++;
     }
     this.moveCount++;
+
+    this.checkDone();
   }
 
-  useAbility(index) {
+  /*
+   * Use the ability in the string action.
+   */
+  useAbility(action) {
+    if (!this.actions.includes(action)) {
+      return;
+    }
+
+    /*
+     * End Turn and Drop for the Mole are always available.
+     */
+
+    if (action === END_LABEL) {
+      this.game.nextToken();
+      return;
+    }
+    if (this.isMole() && action.startsWith('Drop ')) {
+      if (this.game.carryToken instanceof Token) {
+        // Drop the token the Mole was carrying
+        this.game.carryToken = null;
+        this.removeAction(action);
+      }
+      return;
+    }
+
+
     if (this.actionCount >= Token.ACTION_LIMIT) {
       return;
     }
-    if (index < 0) {
-      return;
-    }
-    if (index >= this.availableAbilities.length) {
-      return;
-    }
 
-    let ability = this.availableAbilities.splice(index, 1)[0],
-        cleaned = ability.toLowerCase();
-    if (cleaned.substring(0, 8) === 'add 1 to') {
+    let cleaned = action.toLowerCase();
+    if (this.isMole() && cleaned.startsWith('carry ')) {
+      let tokens = game.getTokensAt(this.location);
+      tokens = tokens.filter(t => ((!t.isMole()) && (!t.isEarthworm())));
+      if (tokens.length > 0) {
+        if (tokens.length === 1) {
+          this.game.carryToken = tokens[0];
+          this.actionCount++;
+          this.removeAction(action, 'Drop ' + game.carryToken.name.substring(6));
+        }
+        else {
+          this.removeAction(action, CARRY_PICK_LABEL);
+        }
+      }
+    }
+    else if (cleaned.startsWith('add 1 to')) {
       if ((this.location.length > 0) && cleaned.includes(this.location)) {
         this.game[this.location] += 1;
         this.actionCount++;
+        this.removeAction(action);
       }
-      else {
-        // Put the ability back because it failed
-        this.availableAbilities.splice(index, 0, ability);
-      }
-      return;
     }
-    if (cleaned.substring(0, 5) === 'draw ') {
+    else if (cleaned.startsWith('draw ')) {
       if (cleaned.includes('discard')) {
         if (this.game.discardPile.length > 0) {
           this.hand.push(this.game.discardPile.pop());
           layoutHand(this.hand);
           this.actionCount++;
-        }
-        else {
-          // Put the ability back because it failed
-          this.availableAbilities.splice(index, 0, ability);
+          this.removeAction(action);
         }
       }
       else if (cleaned.includes('extra')) {
         if (this.takePowerCard()) {
           this.actionCount++;
-        }
-        else {
-          // Put the ability back because it failed
-          this.availableAbilities.splice(index, 0, ability);
+          this.removeAction(action);
         }
       }
-      return;
     }
+
+    this.checkDone();
   }
 
+  /*
+   * Draw/take a soil power card.
+   */
   takePowerCard() {
     if (this.game.powers.length > 0) {
       this.hand.push(this.game.powers.shift());
@@ -409,6 +493,9 @@ class Token extends Actor {
     return false;
   }
 
+  /*
+   * Use the soil power card at index in hand if possible.
+   */
   usePowerCard(index) {
     if (this.actionCount >= Token.ACTION_LIMIT) {
       return;
@@ -416,20 +503,31 @@ class Token extends Actor {
     if (this.location.length <= 0) {
       return;
     }
+    if (index < 0) {
+      return;
+    }
+    if (this.hand.length <= index) {
+      return;
+    }
 
-    let card = this.hand.splice(index, 1)[0];
+    let card = this.hand[index];
     if (card.properties.includes(this.location)) {
       // Card can only be used when the token is on the soil property
       this.game[this.location] += card.delta;
       this.actionCount++;
 
+      // Remove the card from the token's hand and layout the remaining cards
+      this.hand.splice(index, 1);
+      layoutHand(this.hand);
+
       this.game.discardPile.push(card);
+
+      if (this.hand.length <= 0) {
+        this.removeAction(POWER_LABEL);
+      }
     }
-    else {
-      // Put the card back in hand
-      this.hand.splice(index, 0, card);
-    }
-    layoutHand(this.hand);
+
+    this.checkDone();
   }
 }
 
@@ -536,7 +634,7 @@ class Game {
     this.tokens = [
       new Token(this, 'token_actinomycete', ['Draw from discard', 'Add 1 to Organic Matter'], 1),
       new Token(this, 'token_earthworm', ['Add 1 to Porosity'], 3),
-      new Token(this, 'token_fungi', ['Swap a card', 'Add 1 to Aggregate Stability'], 1),
+      new Token(this, 'token_fungi', [SWAP_LABEL, 'Add 1 to Aggregate Stability'], 1),
       new Token(this, 'token_mole', ['Carry a character'], 4),
       new Token(this, 'token_nematode', ['Add 1 to Diversity'], 2),
       new Token(this, 'token_rhizobia', ['Draw an extra card', 'Add 1 to Nutrients'], 1)
@@ -545,11 +643,15 @@ class Game {
 
     this.drawEvent = false;
 
-    // Currently active token
+    // Integer index of the currently active token in this.tokens
     this.index = 0;
 
-    // Token carried by the Mole
+    // Token instance carried by the Mole
     this.carryToken = null;
+
+    // Track the card to swap by the Fungi
+    this.swapSource = -1;
+    this.swapToken = null;
   }
 
   get abundance() {
@@ -786,6 +888,9 @@ class Game {
 
     this.drawEvent = true;
     this.index = 0;
+    this.carryToken = null;
+    this.swapSource = -1;
+    this.swapToken = null;
   }
 
   dismissEventCard() {
@@ -810,13 +915,15 @@ class Game {
           if (i < this.index) {
             this.index--;
           }
+          break;
         }
       }
     }
   }
 
   nextToken() {
-    this.carryToken = null;
+    this.positiveCascade();
+
     if (this.index < (this.tokens.length - 1)) {
       this.index++;
     }
@@ -901,7 +1008,7 @@ function drawTokens(game, location, center) {
   for (let i = 0; i < tokens.length; i++) {
     tokens[i].center = [center[0] + TOKEN_DELTAS[i][0], center[1] + TOKEN_DELTAS[i][1]];
     if (tokens[i] == game.carryToken) {
-      // Draw a highlight under the token carried by the mole
+      // Draw a highlight under the token carried by the Mole
       screen.draw.filled_circle(tokens[i].center, 42, YIELD_COLOR);
     }
     if (tokens[i] == game.currentToken) {
@@ -986,54 +1093,29 @@ function draw() {
 
 
   /*
-   * Draw the buttons
+   * Draw the current token and the buttons for its actions
    */
   screen.draw.filled_rect(new Rect(90, 548, 300, 190), 'white');
 
-
-  if (game.currentToken.actionCount < Token.ACTION_LIMIT) {
-    screen.draw.rect(USE_SOIL, DIAL_COLOR);
-    screen.draw.text('Use Soil Power Card', {
-      midleft: [USE_SOIL.left + 10, USE_SOIL.centery],
+  let actor = new Actor(game.currentToken.name),
+      actions = game.currentToken.actions;
+  actor.bottomright = [BUTTONS[0].left + 20, BUTTONS[0].top + 20];
+  for (let i = 0; i < actions.length; i++) {
+    screen.draw.rect(BUTTONS[i], DIAL_COLOR);
+    screen.draw.text(actions[i], {
+      midleft: [BUTTONS[i].left + 10, BUTTONS[i].centery],
       color: YIELD_COLOR,
       fontsize: 18
     });
   }
-
-  let abilities = game.currentToken.availableAbilities;
-  if (abilities.length > 0) {
-    screen.draw.rect(ABILITY_1, DIAL_COLOR);
-    screen.draw.text(abilities[0], {
-      midleft: [ABILITY_1.left + 10, ABILITY_1.centery],
-      color: YIELD_COLOR,
-      fontsize: 18
-    });
-
-    if (abilities.length > 1) {
-      screen.draw.rect(ABILITY_2, DIAL_COLOR);
-      screen.draw.text(abilities[1], {
-      midleft: [ABILITY_2.left + 10, ABILITY_2.centery],
-        color: YIELD_COLOR,
-        fontsize: 18
-      });
-    }
-  }
-
-  screen.draw.rect(END_TURN, DIAL_COLOR);
-  screen.draw.text('End turn', {
-    midleft: [END_TURN.left + 10, END_TURN.centery],
-    color: YIELD_COLOR,
-    fontsize: 18
-  });
+  actor.draw();
 
 
   if (game.isLost()) {
     drawMessage('YOU\nLOST');
-    return;
   }
   if (game.isWon()) {
     drawMessage('YOU\nWON');
-    return;
   }
 
 
@@ -1051,7 +1133,12 @@ function draw() {
       color: 'white',
       fontsize: 48
     });
-    for (let c of game.currentToken.hand) {
+
+    let hand = game.currentToken.hand;
+    if (drawHand.endsWith('take')) {
+      hand = game.swapToken.hand;
+    }
+    for (let c of hand) {
       c.draw();
     }
   }
@@ -1076,9 +1163,22 @@ function on_mouse_down(pos, buttons) {
     let i = 0;
     for (let c of game.currentToken.hand) {
       if (c.collidepoint(pos)) {
-        game.currentToken.usePowerCard(i);
-        if (game.currentToken.isDone()) {
-          game.nextToken();
+        if (drawHand.endsWith('give')) {
+          game.swapSource = i;
+          game.currentToken.removeAction(SWAP_LABEL, SWAP_PICK_LABEL);
+        }
+        else if (drawHand.endsWith('take')) {
+          let temp = game.currentToken.hand[game.swapSource];
+          game.currentToken.hand[game.swapSource] = game.swapToken.hand[i];
+          game.swapToken.hand[i] = temp;
+          layoutHand(game.currentToken.hand);
+          layoutHand(game.swapToken.hand);
+          game.currentToken.actionCount++;
+          game.currentToken.removeAction(SWAP_PICK_LABEL);
+          game.currentToken.checkDone();
+        }
+        else {
+          game.currentToken.usePowerCard(i);
         }
         break;
       }
@@ -1088,84 +1188,60 @@ function on_mouse_down(pos, buttons) {
     return;
   }
 
-  if (USE_SOIL.collidepoint(pos)) {
-    if (game.currentToken.actionCount < Token.ACTION_LIMIT) {
-      drawHand = 'Pick a Soil Power card to use';
-      return;
-    }
-  }
-
-  let abilities = game.currentToken.availableAbilities;
-  if (abilities.length > 0) {
-    if (game.currentToken.isMole()) {
-      if (abilities[0] === 'Pick a token to carry') {
-        let tokens = game.getTokensAt(game.currentToken.location);
-        tokens = tokens.filter(t => ((!t.isMole()) && (!t.isEarthworm())));
-        for (let t of tokens) {
-          if (t.collidepoint(pos)) {
-            game.carryToken = t;
-            game.currentToken.availableAbilities = ['Drop ' + game.carryToken.name.substring(6)];
-            game.currentToken.actionCount++;
-            return;
-          }
-        }
+  let actions = game.currentToken.actions;
+  if (game.currentToken.isMole() && actions.includes(CARRY_PICK_LABEL)) {
+    let tokens = game.getTokensAt(game.currentToken.location);
+    tokens = tokens.filter(t => ((!t.isMole()) && (!t.isEarthworm())));
+    for (let t of tokens) {
+      if (t.collidepoint(pos)) {
+        game.carryToken = t;
+        game.currentToken.actionCount++;
+        game.currentToken.removeAction(CARRY_PICK_LABEL, 'Drop ' + game.carryToken.name.substring(6));
+        game.currentToken.checkDone();
+        return;
       }
     }
+    // A valid token that can be carried by the Mole was not chosen
+    // Assume the user wants to cancel the action
+    game.currentToken.removeAction(CARRY_PICK_LABEL, 'Carry a character');
+    return;
+  }
+  if (game.currentToken.isMicrobe() && actions.includes(SWAP_PICK_LABEL)) {
+    for (let t of game.tokens) {
+      if (t.collidepoint(pos)) {
+        game.swapToken = t;
+        drawHand = 'Pick a Soil Power card to take';
+        return;
+      }
+    }
+    // A valid token was not chosen
+    // Assume the user wants to cancel the action
+    game.swapSource = -1;
+    game.currentToken.removeAction(SWAP_PICK_LABEL, SWAP_LABEL);
+  }
 
-    if (ABILITY_1.collidepoint(pos)) {
-      if (game.currentToken.isMole()) {
-        if (game.carryToken instanceof Token) {
-          // Drop the token Mole was carrying
-          game.carryToken = null;
-          game.currentToken.availableAbilities = [];
-        }
-        else {
-          let tokens = game.getTokensAt(game.currentToken.location);
-          tokens = tokens.filter(t => ((!t.isMole()) && (!t.isEarthworm())));
-          if (tokens.length > 0) {
-            if (tokens.length === 1) {
-              game.carryToken = tokens[0];
-              game.currentToken.availableAbilities = ['Drop ' + game.carryToken.name.substring(6)];
-              game.currentToken.actionCount++;
-            }
-            else {
-              game.currentToken.availableAbilities = ['Pick a token to carry'];
-            }
-          }
-        }
+  for (let i = 0; i < actions.length; i++) {
+    if (BUTTONS[i].collidepoint(pos)) {
+      if (actions[i] === POWER_LABEL) {
+        drawHand = 'Pick a Soil Power card to use';
+        return;
+      }
+      else if (actions[i] === SWAP_LABEL) {
+        drawHand = 'Pick a Soil Power card to give';
+        return;
       }
       else {
-        game.currentToken.useAbility(0);
+        game.currentToken.useAbility(actions[i]);
+        return;
       }
-      if (game.currentToken.isDone()) {
-        game.nextToken();
-      }
-      return;
-    }
-  }
-  if (abilities.length > 1) {
-    if (ABILITY_2.collidepoint(pos)) {
-      game.currentToken.useAbility(1);
-      if (game.currentToken.isDone()) {
-        game.nextToken();
-      }
-      return;
     }
   }
 
   for (let [property, center] of DIAL_CENTER_MAP) {
     if (Math.hypot(pos[0] - center[0], pos[1] - center[1]) < DIAL_RADIUS) {
       game.currentToken.move(property);
-      if (game.currentToken.isDone()) {
-        game.nextToken();
-      }
       return;
     }
-  }
-
-  if (END_TURN.collidepoint(pos)) {
-    game.nextToken();
-    return;
   }
 }
 
