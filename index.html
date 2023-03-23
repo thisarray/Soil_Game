@@ -74,6 +74,21 @@ The game screen appears here if your browser supports the Canvas API.
   <button type="button" id="pause">Pause</button>
 </section>
 
+<p>On each turn, a character can take <strong>AT MOST 2</strong> actions:</p>
+
+<ul>
+  <li>Move to an adjacent soil property. The number of soil properties you can pass through is determined by the speed of your character.</li>
+  <li>Play a Soil Power card.
+    <ul>
+      <li>The affected soil properties are highlighted in green.</li>
+      <li>Each card <strong>ONLY IMPROVES ONE</strong> of its affected soil properties.</li>
+      <li>The improved soil property is the soil property the character is currently occupying.</li>
+      <li>Playing 2 Soil Power cards counts as 2 actions and completes the turn.</li>
+    </ul>
+  </li>
+  <li>Use a species ability. Each ability can only be used <strong>ONCE</strong> per turn.</li>
+</ul>
+
 <h2>Character descriptions</h2>
 
 <img src="images/character.png" alt="Character descriptions">
@@ -315,7 +330,7 @@ class Token extends Actor {
    */
   reset() {
     this.actions = this.abilities.slice();
-    this.actions.unshift(POWER_LABEL);
+    this.actions.push(POWER_LABEL);
     this.actions.push(END_LABEL);
     this.actionCount = 0;
     this.moveCount = 0;
@@ -929,7 +944,18 @@ class Game {
     }
     else {
       // End the current round and reset for the next round
+      if (this.activity >= Game.MAX_VALUE) {
+        this.activity--;
+      }
+      if (this.nutrients >= Game.MAX_VALUE) {
+        this.nutrients--;
+      }
+      if (this.porosity >= Game.MAX_VALUE) {
+        this.porosity--;
+      }
+
       this.takeEventCard();
+
       for (let t of this.tokens) {
         t.reset();
       }
@@ -1043,7 +1069,6 @@ function layoutHand(hand, columnCount = 5) {
 
   let cardWidth = hand[0].width,
       cardHeight = hand[0].height,
-      offset = 50,
       horizontalGutter = Math.floor((WIDTH - (columnCount * cardWidth)) / (columnCount + 1)),
       i = 0,
       rowCount, verticalGutter, x, y;
@@ -1054,9 +1079,9 @@ function layoutHand(hand, columnCount = 5) {
   else {
     rowCount = 2;
   }
-  verticalGutter = Math.floor((HEIGHT - (rowCount * cardHeight) - offset) / (rowCount + 1));
+  verticalGutter = Math.floor((HEIGHT - (rowCount * cardHeight)) / (rowCount + 1));
 
-  y = offset + verticalGutter;
+  y = verticalGutter;
   for (let r = 0; r < rowCount; r++) {
     x = horizontalGutter;
     for (let c = 0; c < columnCount; c++) {
@@ -1098,12 +1123,13 @@ function draw() {
   screen.draw.filled_rect(new Rect(90, 548, 300, 190), 'white');
 
   let actor = new Actor(game.currentToken.name),
-      actions = game.currentToken.actions;
+      actions = game.currentToken.actions,
+      zones = BUTTONS.slice(BUTTONS.length - actions.length);
   actor.bottomright = [BUTTONS[0].left + 20, BUTTONS[0].top + 20];
   for (let i = 0; i < actions.length; i++) {
-    screen.draw.rect(BUTTONS[i], DIAL_COLOR);
+    screen.draw.rect(zones[i], DIAL_COLOR);
     screen.draw.text(actions[i], {
-      midleft: [BUTTONS[i].left + 10, BUTTONS[i].centery],
+      midleft: [zones[i].left + 10, zones[i].centery],
       color: YIELD_COLOR,
       fontsize: 18
     });
@@ -1129,9 +1155,9 @@ function draw() {
   if (drawHand.length > 0) {
     drawOverlay();
     screen.draw.text(drawHand, {
-      center: [Math.floor(WIDTH / 2), 25],
+      center: [Math.floor(WIDTH / 2), 50],
       color: 'white',
-      fontsize: 48
+      fontsize: 64
     });
 
     let hand = game.currentToken.hand;
@@ -1145,8 +1171,6 @@ function draw() {
 }
 
 function on_mouse_down(pos, buttons) {
-  console.log(pos);
-
   if (game.isLost()) {
     return;
   }
@@ -1188,7 +1212,8 @@ function on_mouse_down(pos, buttons) {
     return;
   }
 
-  let actions = game.currentToken.actions;
+  let actions = game.currentToken.actions,
+      zones = BUTTONS.slice(BUTTONS.length - actions.length);
   if (game.currentToken.isMole() && actions.includes(CARRY_PICK_LABEL)) {
     let tokens = game.getTokensAt(game.currentToken.location);
     tokens = tokens.filter(t => ((!t.isMole()) && (!t.isEarthworm())));
@@ -1221,7 +1246,7 @@ function on_mouse_down(pos, buttons) {
   }
 
   for (let i = 0; i < actions.length; i++) {
-    if (BUTTONS[i].collidepoint(pos)) {
+    if (zones[i].collidepoint(pos)) {
       if (actions[i] === POWER_LABEL) {
         drawHand = 'Pick a Soil Power card to use';
         return;
