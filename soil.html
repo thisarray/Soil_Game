@@ -36,6 +36,9 @@ The game screen appears here if your browser supports the Canvas API.
   <button type="button" id="pause">Pause</button>
 </section>
 
+<p>Left-click a soil property dial to increment it.
+Right-click a soil property dial to decrement it.</p>
+
 <h2>Attribution</h2>
 
 <p>Based on <a href="https://soilgame.wixsite.com/free2print">Dirty Matters: The Soil Game</a>.</p>
@@ -49,12 +52,12 @@ WIDTH = 1550;
 HEIGHT = 1078;
 
 /*
- * Number angle to the center of each dial petal in radians.
+ * Number angle in radians to the center of each dial petal.
  */
 const DIAL_ANGLE = Math.PI / 8;
 
 /*
- * Map mapping the string name to the center coordinates of each dial.
+ * Map mapping a string soil property to the array integer center coordinates of its dial.
  */
 const DIAL_CENTER_MAP = new Map([
   ['abundance', [904, 254]],
@@ -299,7 +302,7 @@ class Game {
   }
 
   isBreakdown() {
-    return ((this.organic === Game.MIN_VALUE) || (this.activity === Game.MAX_VALUE));
+    return ((this.organic <= Game.MIN_VALUE) || (this.activity >= Game.MAX_VALUE));
   }
 
   isFamine() {
@@ -312,9 +315,9 @@ class Game {
   }
 
   isWaterPolluted() {
-    return ((this.aggregate === Game.MIN_VALUE) ||
-            (this.nutrients === Game.MAX_VALUE) ||
-            (this.porosity === Game.MAX_VALUE));
+    return ((this.aggregate <= Game.MIN_VALUE) ||
+            (this.nutrients >= Game.MAX_VALUE) ||
+            (this.porosity >= Game.MAX_VALUE));
   }
 
   isLost() {
@@ -444,8 +447,6 @@ function draw() {
 }
 
 function on_mouse_down(pos, buttons) {
-  console.log(pos);
-
   for (let [property, center] of DIAL_CENTER_MAP) {
     if (Math.hypot(pos[0] - center[0], pos[1] - center[1]) < DIAL_RADIUS) {
       if ((buttons & mouse.LEFT) > 0) {
