@@ -54,6 +54,9 @@ The game screen appears here if your browser supports the Canvas API.
   <button type="button" id="pause">Pause</button>
 </section>
 
+<p>Left-click a soil property dial to increment it.
+Right-click a soil property dial to decrement it.</p>
+
 <h2>Attribution</h2>
 
 <p>Based on <a href="https://soilgame.wixsite.com/free2print">Dirty Matters: The Soil Game</a>.</p>
@@ -67,12 +70,12 @@ WIDTH = 1550;
 HEIGHT = 1078;
 
 /*
- * Number angle to the center of each dial petal in radians.
+ * Number angle in radians to the center of each dial petal.
  */
 const DIAL_ANGLE = Math.PI / 8;
 
 /*
- * Map mapping the string name to the center coordinates of each dial.
+ * Map mapping a string soil property to the array integer center coordinates of its dial.
  */
 const DIAL_CENTER_MAP = new Map([
   ['abundance', [904, 254]],
@@ -146,16 +149,16 @@ const TAKE_EVENT = new Rect(90, 548, 300, 190);
 class EventCard extends Actor {
   /*
    * name: String name of the image for the event card.
-   * deduction: Positive integer amount to deduct from each soil property.
-   * properties: Array of string names of the soil properties affected.
+   * properties: Array of string soil properties affected.
+   * delta: Integer change to each soil property.
    */
-  constructor(name, deduction, properties) {
+  constructor(name, properties, delta) {
     super(name);
 
     this.pos = [Math.floor(WIDTH / 2), Math.floor(HEIGHT / 2)];
 
-    this.deduction = deduction;
     this.properties = properties.slice();
+    this.delta = delta;
   }
 }
 
@@ -188,29 +191,30 @@ class Game {
     this._nutrients = 2;
     this._organic = 2;
 
-    this.showEventCard = false;
     // Array deck of event cards
     this.events = [
-      new EventCard('event_acid', 2, ['acidity']),
-      new EventCard('event_carbon', 2, ['organic']),
-      new EventCard('event_climate', 1, ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'depth', 'acidity', 'nutrients', 'organic']),
-      new EventCard('event_compaction', 1, ['porosity', 'aggregate', 'depth']),
-      new EventCard('event_contamination', 1, ['abundance', 'diversity', 'activity', 'acidity']),
-      new EventCard('event_depletion', 2, ['nutrients']),
-      new EventCard('event_desertification', 1, ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'depth', 'acidity', 'nutrients', 'organic']),
-      new EventCard('event_drought', 1, ['abundance', 'activity', 'porosity', 'nutrients']),
-      new EventCard('event_erosion', 1, ['porosity', 'depth', 'nutrients', 'organic']),
-      new EventCard('event_fertiliser', 1, ['diversity', 'acidity', 'organic']),
-      new EventCard('event_landuse', 1, ['abundance', 'diversity', 'porosity', 'aggregate', 'depth', 'organic']),
-      new EventCard('event_overgrazing', 1, ['porosity', 'aggregate', 'depth', 'acidity', 'organic']),
-      new EventCard('event_pest', 1, ['abundance', 'diversity', 'activity']),
-      new EventCard('event_pesticides', 1, ['abundance', 'diversity']),
-      new EventCard('event_salinisation', 1, ['abundance', 'diversity', 'activity', 'aggregate', 'acidity', 'nutrients', 'organic']),
-      new EventCard('event_sealing', 2, ['porosity']),
-      new EventCard('event_waterlogging', 1, ['abundance', 'diversity', 'porosity']),
-      new EventCard('event_wildfire', 1, ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'acidity', 'nutrients', 'organic'])
+      new EventCard('event_acid', ['acidity'], -2),
+      new EventCard('event_carbon', ['organic'], -2),
+      new EventCard('event_climate', ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'depth', 'acidity', 'nutrients', 'organic'], -1),
+      new EventCard('event_compaction', ['porosity', 'aggregate', 'depth'], -1),
+      new EventCard('event_contamination', ['abundance', 'diversity', 'activity', 'acidity'], -1),
+      new EventCard('event_depletion', ['nutrients'], -2),
+      new EventCard('event_desertification', ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'depth', 'acidity', 'nutrients', 'organic'], -1),
+      new EventCard('event_drought', ['abundance', 'activity', 'porosity', 'nutrients'], -1),
+      new EventCard('event_erosion', ['porosity', 'depth', 'nutrients', 'organic'], -1),
+      new EventCard('event_fertiliser', ['diversity', 'acidity', 'organic'], -1),
+      new EventCard('event_landuse', ['abundance', 'diversity', 'porosity', 'aggregate', 'depth', 'organic'], -1),
+      new EventCard('event_overgrazing', ['porosity', 'aggregate', 'depth', 'acidity', 'organic'], -1),
+      new EventCard('event_pest', ['abundance', 'diversity', 'activity'], -1),
+      new EventCard('event_pesticides', ['abundance', 'diversity'], -1),
+      new EventCard('event_salinisation', ['abundance', 'diversity', 'activity', 'aggregate', 'acidity', 'nutrients', 'organic'], -1),
+      new EventCard('event_sealing', ['porosity'], -2),
+      new EventCard('event_waterlogging', ['abundance', 'diversity', 'porosity'], -1),
+      new EventCard('event_wildfire', ['abundance', 'diversity', 'activity', 'porosity', 'aggregate', 'acidity', 'nutrients', 'organic'], -1)
     ];
     shuffle(this.events);
+
+    this.showEventCard = false;
   }
 
   get abundance() {
@@ -385,7 +389,7 @@ class Game {
   }
 
   isBreakdown() {
-    return ((this.organic === Game.MIN_VALUE) || (this.activity === Game.MAX_VALUE));
+    return ((this.organic <= Game.MIN_VALUE) || (this.activity >= Game.MAX_VALUE));
   }
 
   isFamine() {
@@ -398,9 +402,9 @@ class Game {
   }
 
   isWaterPolluted() {
-    return ((this.aggregate === Game.MIN_VALUE) ||
-            (this.nutrients === Game.MAX_VALUE) ||
-            (this.porosity === Game.MAX_VALUE));
+    return ((this.aggregate <= Game.MIN_VALUE) ||
+            (this.nutrients >= Game.MAX_VALUE) ||
+            (this.porosity >= Game.MAX_VALUE));
   }
 
   isLost() {
@@ -432,9 +436,8 @@ class Game {
   }
 
   takeEventCard() {
-    let event = this.events[0];
-    for (let p of event.properties) {
-      this[p] -= event.deduction;
+    for (let p of this.events[0].properties) {
+      this[p] += this.events[0].delta;
     }
     this.showEventCard = true;
   }
@@ -559,8 +562,6 @@ function draw() {
 }
 
 function on_mouse_down(pos, buttons) {
-  console.log(pos);
-
   if (game.showEventCard) {
     game.dismissEventCard();
     return;
