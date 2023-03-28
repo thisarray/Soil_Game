@@ -68,6 +68,11 @@ The game screen appears here if your browser supports the Canvas API.
   <button type="button" id="pause">Pause</button>
 </section>
 
+<p>Left-click a soil property dial to increment it.
+Right-click a soil property dial to decrement it.</p>
+
+<p>The affected soil properties of a Soil Power card are highlighted in green.</p>
+
 <h2>Attribution</h2>
 
 <p>Based on <a href="https://soilgame.wixsite.com/free2print">Dirty Matters: The Soil Game</a>.</p>
@@ -81,12 +86,12 @@ WIDTH = 1550;
 HEIGHT = 1078;
 
 /*
- * Number angle to the center of each dial petal in radians.
+ * Number angle in radians to the center of each dial petal.
  */
 const DIAL_ANGLE = Math.PI / 8;
 
 /*
- * Map mapping the string name to the center coordinates of each dial.
+ * Map mapping a string soil property to the array integer center coordinates of its dial.
  */
 const DIAL_CENTER_MAP = new Map([
   ['abundance', [904, 254]],
@@ -168,14 +173,14 @@ const USE_POWER = new Rect(240, 548, 150, 190);
 class Card extends Actor {
   /*
    * name: String name of the image for the card.
-   * properties: Array of string names of the soil properties affected.
+   * properties: Array of string soil properties affected.
    * delta: Integer change to each soil property. Defaults to 1.
    */
   constructor(name, properties, delta = 1) {
     super(name);
 
-    this.delta = delta;
     this.properties = properties.slice();
+    this.delta = delta;
   }
 }
 
@@ -185,7 +190,7 @@ class Card extends Actor {
 class EventCard extends Card {
   /*
    * name: String name of the image for the event card.
-   * properties: Array of string names of the soil properties affected.
+   * properties: Array of string soil properties affected.
    * delta: Integer change to each soil property.
    */
   constructor(name, properties, delta) {
@@ -222,8 +227,6 @@ class Game {
     this._acidity = 2;
     this._nutrients = 2;
     this._organic = 2;
-
-    this.state = State.BOARD;
 
     // Array deck of event cards
     this.events = [
@@ -295,6 +298,8 @@ class Game {
     shuffle(this.powers);
 
     this.discardPile = [];
+
+    this.state = State.BOARD;
   }
 
   get abundance() {
@@ -469,7 +474,7 @@ class Game {
   }
 
   isBreakdown() {
-    return ((this.organic === Game.MIN_VALUE) || (this.activity === Game.MAX_VALUE));
+    return ((this.organic <= Game.MIN_VALUE) || (this.activity >= Game.MAX_VALUE));
   }
 
   isFamine() {
@@ -482,9 +487,9 @@ class Game {
   }
 
   isWaterPolluted() {
-    return ((this.aggregate === Game.MIN_VALUE) ||
-            (this.nutrients === Game.MAX_VALUE) ||
-            (this.porosity === Game.MAX_VALUE));
+    return ((this.aggregate <= Game.MIN_VALUE) ||
+            (this.nutrients >= Game.MAX_VALUE) ||
+            (this.porosity >= Game.MAX_VALUE));
   }
 
   isLost() {
@@ -702,8 +707,6 @@ function draw() {
 }
 
 function on_mouse_down(pos, buttons) {
-  console.log(pos);
-
   if (game.state === State.EVENT) {
     game.dismissEventCard();
     return;
