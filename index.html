@@ -160,7 +160,7 @@ const YIELD_COLOR = [174, 71, 64];
 const STARTING_AREA = [1010, 550];
 
 /*
- * Array integer offsets relative to a center to position each token.
+ * Array of integer offsets relative to a center to position each token.
  */
 const TOKEN_DELTAS = [
   [-60, -60], [0, -60], [60, -60], [60, 60], [0, 60], [-60, 60]
@@ -456,13 +456,13 @@ class Token extends Actor {
 
     let cleaned = action.toLowerCase();
     if (this.isMole() && cleaned.startsWith('carry ')) {
-      let tokens = game.getTokensAt(this.location);
+      let tokens = this.game.getTokensAt(this.location);
       tokens = tokens.filter(t => ((!t.isMole()) && (!t.isEarthworm())));
       if (tokens.length > 0) {
         if (tokens.length === 1) {
           this.game.carryToken = tokens[0];
           this.actionCount++;
-          this.removeAction(action, 'Drop ' + game.carryToken.name.substring(6));
+          this.removeAction(action, 'Drop ' + this.game.carryToken.name.substring(6));
         }
         else {
           this.removeAction(action, CARRY_PICK_LABEL);
@@ -657,9 +657,10 @@ class Game {
     shuffle(this.tokens);
 
     this.drawEvent = false;
+    this.drawHand = '';
 
     // Integer index of the currently active token in this.tokens
-    this.index = 0;
+    this.index = this.tokens.length;
 
     // Token instance carried by the Mole
     this.carryToken = null;
@@ -667,6 +668,8 @@ class Game {
     // Track the card to swap by the Fungi
     this.swapSource = -1;
     this.swapToken = null;
+
+    this.nextToken();
   }
 
   get abundance() {
@@ -895,19 +898,6 @@ class Game {
     return ((!this.isLost()) && (this.foodYield >= 30));
   }
 
-  takeEventCard() {
-    for (let p of this.events[0].properties) {
-      this[p] += this.events[0].delta;
-    }
-    this.negativeCascade();
-
-    this.drawEvent = true;
-    this.index = 0;
-    this.carryToken = null;
-    this.swapSource = -1;
-    this.swapToken = null;
-  }
-
   dismissEventCard() {
     this.drawEvent = false;
     // Move the card to the bottom of the deck
@@ -937,6 +927,10 @@ class Game {
   }
 
   nextToken() {
+    this.carryToken = null;
+    this.swapSource = -1;
+    this.swapToken = null;
+
     this.positiveCascade();
 
     if (this.index < (this.tokens.length - 1)) {
@@ -954,8 +948,14 @@ class Game {
         this.porosity--;
       }
 
-      this.takeEventCard();
+      for (let p of this.events[0].properties) {
+        this[p] += this.events[0].delta;
+      }
+      this.negativeCascade();
 
+      this.drawEvent = true;
+
+      this.index = 0;
       for (let t of this.tokens) {
         t.reset();
       }
@@ -998,16 +998,31 @@ class Game {
 
     screen.draw.filled_rect(new Rect(428, breakpoint, 90, 1060 - breakpoint), YIELD_COLOR);
   }
+
+  /*
+   * Draw the character tokens at location centered at center.
+   */
+  drawTokens(location, center) {
+    let tokens = this.getTokensAt(location);
+    for (let i = 0; i < tokens.length; i++) {
+      tokens[i].center = [center[0] + TOKEN_DELTAS[i][0], center[1] + TOKEN_DELTAS[i][1]];
+      if (tokens[i] == this.carryToken) {
+        // Draw a highlight under the token carried by the Mole
+        screen.draw.filled_circle(tokens[i].center, 42, YIELD_COLOR);
+      }
+      if (tokens[i] == this.currentToken) {
+        // Draw a highlight under the currently active token
+        screen.draw.filled_circle(tokens[i].center, 45, DIAL_COLOR);
+      }
+      tokens[i].draw();
+    }
+  }
 }
 
-let game, drawHand;
+let game;
 
 function reset() {
   game = new Game();
-
-  game.takeEventCard();
-  game.currentToken.takePowerCard();
-  drawHand = '';
 }
 
 /*
@@ -1024,25 +1039,6 @@ function drawDial(center, value) {
       high = [center[0] + ((DIAL_RADIUS + 20) * Math.sin(highAngle)),
               center[1] - ((DIAL_RADIUS + 20) * Math.cos(highAngle))];
   screen.draw.filled_polygon([middle, low, high], DIAL_COLOR);
-}
-
-/*
- * Draw the character tokens at location centered at center.
- */
-function drawTokens(game, location, center) {
-  let tokens = game.getTokensAt(location);
-  for (let i = 0; i < tokens.length; i++) {
-    tokens[i].center = [center[0] + TOKEN_DELTAS[i][0], center[1] + TOKEN_DELTAS[i][1]];
-    if (tokens[i] == game.carryToken) {
-      // Draw a highlight under the token carried by the Mole
-      screen.draw.filled_circle(tokens[i].center, 42, YIELD_COLOR);
-    }
-    if (tokens[i] == game.currentToken) {
-      // Draw a highlight under the currently active token
-      screen.draw.filled_circle(tokens[i].center, 45, DIAL_COLOR);
-    }
-    tokens[i].draw();
-  }
 }
 
 function drawMessage(message) {
@@ -1102,9 +1098,9 @@ function draw() {
 
   for (let [property, center] of DIAL_CENTER_MAP) {
     drawDial(center, game[property]);
-    drawTokens(game, property, center);
+    game.drawTokens(property, center);
   }
-  drawTokens(game, '', STARTING_AREA);
+  game.drawTokens('', STARTING_AREA);
 
   if (game.isFamine()) {
     screen.draw.rect(new Rect(244, 800, 150, 55), DIAL_COLOR, 2);
@@ -1152,16 +1148,16 @@ function draw() {
     drawOverlay();
     game.events[0].draw();
   }
-  if (drawHand.length > 0) {
+  if (game.drawHand.length > 0) {
     drawOverlay();
-    screen.draw.text(drawHand, {
+    screen.draw.text(game.drawHand, {
       center: [Math.floor(WIDTH / 2), 50],
       color: 'white',
       fontsize: 64
     });
 
     let hand = game.currentToken.hand;
-    if (drawHand.endsWith('take')) {
+    if (game.drawHand.endsWith('take')) {
       hand = game.swapToken.hand;
     }
     for (let c of hand) {
@@ -1183,16 +1179,21 @@ function on_mouse_down(pos, buttons) {
     return;
   }
 
-  if (drawHand.length > 0) {
-    let i = 0;
-    for (let c of game.currentToken.hand) {
+  if (game.drawHand.length > 0) {
+    let hand = game.currentToken.hand,
+        i = 0,
+        temp;
+    if (game.drawHand.endsWith('take')) {
+      hand = game.swapToken.hand;
+    }
+    for (let c of hand) {
       if (c.collidepoint(pos)) {
-        if (drawHand.endsWith('give')) {
+        if (game.drawHand.endsWith('give')) {
           game.swapSource = i;
           game.currentToken.removeAction(SWAP_LABEL, SWAP_PICK_LABEL);
         }
-        else if (drawHand.endsWith('take')) {
-          let temp = game.currentToken.hand[game.swapSource];
+        else if (game.drawHand.endsWith('take')) {
+          temp = game.currentToken.hand[game.swapSource];
           game.currentToken.hand[game.swapSource] = game.swapToken.hand[i];
           game.swapToken.hand[i] = temp;
           layoutHand(game.currentToken.hand);
@@ -1208,7 +1209,7 @@ function on_mouse_down(pos, buttons) {
       }
       i++;
     }
-    drawHand = '';
+    game.drawHand = '';
     return;
   }
 
@@ -1235,7 +1236,7 @@ function on_mouse_down(pos, buttons) {
     for (let t of game.tokens) {
       if (t.collidepoint(pos)) {
         game.swapToken = t;
-        drawHand = 'Pick a Soil Power card to take';
+        game.drawHand = 'Pick a Soil Power card to take';
         return;
       }
     }
@@ -1243,22 +1244,21 @@ function on_mouse_down(pos, buttons) {
     // Assume the user wants to cancel the action
     game.swapSource = -1;
     game.currentToken.removeAction(SWAP_PICK_LABEL, SWAP_LABEL);
+    return;
   }
 
   for (let i = 0; i < actions.length; i++) {
     if (zones[i].collidepoint(pos)) {
       if (actions[i] === POWER_LABEL) {
-        drawHand = 'Pick a Soil Power card to use';
-        return;
+        game.drawHand = 'Pick a Soil Power card to use';
       }
       else if (actions[i] === SWAP_LABEL) {
-        drawHand = 'Pick a Soil Power card to give';
-        return;
+        game.drawHand = 'Pick a Soil Power card to give';
       }
       else {
         game.currentToken.useAbility(actions[i]);
-        return;
       }
+      return;
     }
   }
 
