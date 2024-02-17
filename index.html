@@ -1006,11 +1006,11 @@ class Game {
     let tokens = this.getTokensAt(location);
     for (let i = 0; i < tokens.length; i++) {
       tokens[i].center = [center[0] + TOKEN_DELTAS[i][0], center[1] + TOKEN_DELTAS[i][1]];
-      if (tokens[i] == this.carryToken) {
+      if (tokens[i] === this.carryToken) {
         // Draw a highlight under the token carried by the Mole
         screen.draw.filled_circle(tokens[i].center, 42, YIELD_COLOR);
       }
-      if (tokens[i] == this.currentToken) {
+      if (tokens[i] === this.currentToken) {
         // Draw a highlight under the currently active token
         screen.draw.filled_circle(tokens[i].center, 45, DIAL_COLOR);
       }
